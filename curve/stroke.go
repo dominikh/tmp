@@ -12,7 +12,7 @@ import (
 	"slices"
 )
 
-// / Defines the connection between two segments of a stroke.
+// Join defines the connection between two segments of a stroke.
 type Join int
 
 const (
@@ -24,7 +24,7 @@ const (
 	RoundJoin
 )
 
-// / Defines the shape to be drawn at the ends of a stroke.
+// Cap defines the shape to be drawn at the ends of a stroke.
 type Cap int
 
 const (
@@ -36,7 +36,7 @@ const (
 	RoundCap
 )
 
-// / Describes the visual style of a stroke.
+// Stroke describes the visual style of a stroke.
 type Stroke struct {
 	// Width of the stroke.
 	Width float64
@@ -54,12 +54,12 @@ type Stroke struct {
 	DashOffset float64
 }
 
-// / Options for path stroking.
+// StrokeOpts describes options for path stroking.
 type StrokeOpts struct {
 	OptLevel OptLevel
 }
 
-// / Optimization level for computing stroke.
+// OptLevel defines the optimization level for computing strokes.
 type OptLevel int
 
 const (
@@ -134,7 +134,7 @@ func StrokePath(
 	}
 }
 
-// / Version of stroke expansion for styles with no dashes.
+// Version of stroke expansion for styles with no dashes.
 func strokeUndashed(
 	path iter.Seq[PathElement],
 	style Stroke,
@@ -192,7 +192,7 @@ func strokeUndashed(
 	return ctx.output
 }
 
-// / Append forward and backward paths to output.
+// Append forward and backward paths to output.
 func (ctx *strokeCtx) finish(style Stroke) {
 	// TODO: scale
 	const tolerance = 1e-3
@@ -227,7 +227,7 @@ func (ctx *strokeCtx) finish(style Stroke) {
 	ctx.backwardPath.Truncate(0)
 }
 
-// / Finish a closed path
+// Finish a closed path
 func (ctx *strokeCtx) finishClosed(style Stroke) {
 	if !ctx.forwardPath.HasSegments() {
 		return
@@ -374,11 +374,11 @@ func (ctx *strokeCtx) doCubic(style Stroke, c CubicBez, tolerance float64, opts 
 	ctx.lastPt = c.P3
 }
 
-// / Do a cubic which is actually linear.
-// /
-// / The `p` argument is the control points projected to the reference chord.
-// / The ref arguments are the inverse map of a projection back to the client
-// / coordinate space.
+// Do a cubic which is actually linear.
+//
+// The p argument is the control points projected to the reference chord.
+// The ref arguments are the inverse map of a projection back to the client
+// coordinate space.
 func (ctx *strokeCtx) doLinear(
 	style Stroke,
 	c CubicBez,
@@ -669,7 +669,7 @@ func (di *dashIterator) getInput() {
 	di.t = 0.0
 }
 
-// / Move arc length forward to next event.
+// Move arc length forward to next event.
 func (di *dashIterator) step() (PathElement, bool) {
 	var result PathElement
 	var hasResult bool
