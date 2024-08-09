@@ -148,6 +148,10 @@ func (seg PathSegment) BoundingBox() Rect {
 	}
 }
 
+func (seg PathSegment) Path(tolerance float64) BezPath {
+	return slices.Collect(seg.PathElements(tolerance))
+}
+
 // PathElements implements Shape.
 func (seg PathSegment) PathElements(tolerance float64) iter.Seq[PathElement] {
 	return func(yield func(PathElement) bool) {
@@ -607,6 +611,8 @@ func (seg PathSegment) Tangents() (Vec2, Vec2) {
 type BezPath []PathElement
 
 var _ Shape = BezPath{}
+
+func (p BezPath) Path(tolerance float64) BezPath { return p }
 
 func (p BezPath) PathElements(tolerance float64) iter.Seq[PathElement] {
 	return slices.Values([]PathElement(p))

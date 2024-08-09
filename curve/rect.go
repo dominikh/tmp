@@ -9,6 +9,7 @@ package curve
 import (
 	"iter"
 	"math"
+	"slices"
 )
 
 type Rect struct {
@@ -336,6 +337,8 @@ func (r Rect) Winding(pt Point) int {
 		return 0
 	}
 }
+
+func (r Rect) Path(tolerance float64) BezPath { return slices.Collect(r.PathElements(tolerance)) }
 
 func (r Rect) PathElements(tolerance float64) iter.Seq[PathElement] {
 	return func(yield func(PathElement) bool) {

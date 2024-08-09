@@ -9,6 +9,7 @@ package curve
 import (
 	"iter"
 	"math"
+	"slices"
 )
 
 var _ Shape = QuadBez{}
@@ -23,6 +24,8 @@ type QuadBez struct {
 func (q QuadBez) BoundingBox() Rect {
 	return BoundingBox(q)
 }
+
+func (q QuadBez) Path(tolerance float64) BezPath { return slices.Collect(q.PathElements(tolerance)) }
 
 func (q QuadBez) PathElements(tolerance float64) iter.Seq[PathElement] {
 	return func(yield func(PathElement) bool) {

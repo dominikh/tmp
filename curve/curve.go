@@ -113,6 +113,8 @@ type Shape interface {
 	// Note that in general the number of cubic Bézier segments scales as
 	// 'tolerance ** (-1/6)'.
 	PathElements(tolerance float64) iter.Seq[PathElement]
+
+	Path(tolerance float64) BezPath
 }
 
 // ParametricCurve describes a curve parametrized by a scalar.
