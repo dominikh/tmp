@@ -79,7 +79,7 @@ func SliceCast[Dst ~[]DstE, Src ~[]SrcE, DstE, SrcE any](x Src) Dst {
 // absolutely no safety checks.
 func Index[E any, S ~[]E, Int constraints.Integer](ptr S, idx Int) *E {
 	offset := unsafe.Sizeof(*new(E)) * uintptr(idx)
-	return (*E)(unsafe.Add(unsafe.Pointer(&ptr[0]), offset))
+	return (*E)(unsafe.Add(*(*unsafe.Pointer)(unsafe.Pointer(&ptr)), offset))
 }
 
 // AsBytes returns the underlying byte representation of the value pointed to by
