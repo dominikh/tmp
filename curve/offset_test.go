@@ -21,13 +21,9 @@ func TestOffsetPathologicalCurves(t *testing.T) {
 	}
 	const offset = 3603.7267536453924
 	const accuracy = 0.1
-	offsetPath := NewCubicOffset(curve, offset, 1)
-	path := FitToBezPathOpt(&offsetPath, accuracy)
-	if path[0].Kind != MoveToKind {
-		t.Fatalf("did not get valid path")
-	}
-	pathOpt := FitToBezPath(&offsetPath, accuracy)
-	next, cancel := iter.Pull(pathOpt)
+
+	path := offsetCubic(curve, offset, accuracy)
+	next, cancel := iter.Pull(path)
 	defer cancel()
 	if v, ok := next(); !ok || v.Kind != MoveToKind {
 		t.Fatalf("did not get valid path")
@@ -36,17 +32,17 @@ func TestOffsetPathologicalCurves(t *testing.T) {
 
 // Cubic offset that used to trigger infinite recursion.
 func TestOffsetInfiniteRecursion(t *testing.T) {
-	const dimTune = 0.25
 	const tolerance = 0.1
+	const offset = -0.5
 	c := CubicBez{
 		Pt(1096.2962962962963, 593.90243902439033),
 		Pt(1043.6213991769548, 593.90243902439033),
 		Pt(1030.4526748971193, 593.90243902439033),
 		Pt(1056.7901234567901, 593.90243902439033),
 	}
-	co := NewCubicOffset(c, -0.5, dimTune*tolerance)
 	// Test that we terminate
-	FitToBezPath(&co, tolerance)
+	for range offsetCubic(c, offset, tolerance) {
+	}
 }
 
 func TestCubicOffsetSimpleLine(t *testing.T) {
@@ -56,7 +52,7 @@ func TestCubicOffsetSimpleLine(t *testing.T) {
 		Pt(20.0, 0.0),
 		Pt(30.0, 0.0),
 	}
-	offset := NewCubicOffset(cubic, 5.0, 1)
 	// Test that we terminate
-	FitToBezPath(&offset, 1e-6)
+	for range offsetCubic(cubic, 5, 1e-6) {
+	}
 }

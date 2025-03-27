@@ -257,38 +257,15 @@ func (c CubicBez) Extrema() ([MaxExtrema]float64, int) {
 	return out, outN
 }
 
-// regularize preprocesses a cubic Bézier to ease numerical robustness.
+// regularizeCusp preprocesses a cubic Bézier to ease numerical robustness.
 //
-// If the cubic Bézier segment has zero or near-zero derivatives, perturb
-// the control points to make it easier to process (especially offset and
-// stroke), avoiding numerical robustness problems.
-func (c CubicBez) regularize(dimension float64) CubicBez {
+// If the cubic Bézier segment has zero or near-zero derivatives as an interior
+// cusp, perturb the control points to make curvature finite, avoiding
+// numerical robustness problems in offset and stroke.
+func (c CubicBez) regularizeCusp(dimension float64) CubicBez {
 	out := c
-	// First step: if control point is too near the endpoint, nudge it away
-	// along the tangent.
-	dim2 := dimension * dimension
-	if out.P0.DistanceSquared(out.P1) < dim2 {
-		d02 := out.P0.DistanceSquared(out.P2)
-		if d02 >= dim2 {
-			// TODO: moderate if this would move closer to p3
-			out.P1 = out.P0.Lerp(out.P2, math.Sqrt(dim2/d02))
-		} else {
-			out.P1 = out.P0.Lerp(out.P3, 1.0/3.0)
-			out.P2 = out.P3.Lerp(out.P0, 1.0/3.0)
-			return out
-		}
-	}
-	if out.P3.DistanceSquared(out.P2) < dim2 {
-		d13 := out.P1.DistanceSquared(out.P2)
-		if d13 >= dim2 {
-			// TODO: moderate if this would move closer to p0
-			out.P2 = out.P3.Lerp(out.P1, math.Sqrt(dim2/d13))
-		} else {
-			out.P1 = out.P0.Lerp(out.P3, 1.0/3.0)
-			out.P2 = out.P3.Lerp(out.P0, 1.0/3.0)
-			return out
-		}
-	}
+	// If control point is too near the endpoint, nudge it away along the
+	// tangent.
 	if cuspType, ok := c.detectCusp(dimension); ok {
 		d01 := out.P1.Sub(out.P0)
 		d01h := d01.Hypot()

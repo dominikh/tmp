@@ -61,6 +61,12 @@ type StrokeOpts struct {
 }
 
 // OptLevel defines the optimization level for computing strokes.
+//
+// Note that in the current implementation, this setting has no effect.
+// However, having a tradeoff between optimization of number of segments
+// and speed makes sense and may be added in the future, so applications
+// should set it appropriately. For real time rendering, the appropriate
+// value is [Subdivide].
 type OptLevel int
 
 const (
@@ -116,10 +122,13 @@ type strokeCtx struct {
 // StrokePath expands a stroke into a fill.
 //
 // The tolerance parameter controls the accuracy of the result. In general,
-// the number of subdivisions in the output scales to the -1/6 power of the
-// parameter, for example making it 1/64 as big generates twice as many
-// segments. The appropriate value depends on the application; if the result
-// of the stroke will be scaled up, a smaller value is needed.
+// the number of subdivisions in the output scales at least to the -1/4 power
+// of the parameter, for example making it 1/16 as big generates twice as many
+// segments. Currently the algorithm is not tuned for extremely fine tolerances.
+// The theoretically optimum scaling exponent is -1/6, but achieving this may
+// require slow numerical techniques (currently a subject of research). The
+// appropriate value depends on the application; if the result of the stroke
+// will be scaled up, a smaller value is needed.
 //
 // This method attempts a fairly high degree of correctness, but ultimately
 // is based on computing parallel curves and adding joins and caps, rather than
@@ -134,10 +143,10 @@ func StrokePath(
 	tolerance float64,
 ) iter.Seq[PathElement] {
 	if len(style.DashPattern) == 0 {
-		return strokeUndashed(path, style, tolerance, opts)
+		return strokeUndashed(path, style, tolerance)
 	} else {
 		dashed := Dash(path, style.DashOffset, style.DashPattern)
-		return strokeUndashed(dashed, style, tolerance, opts)
+		return strokeUndashed(dashed, style, tolerance)
 	}
 }
 
@@ -146,7 +155,6 @@ func strokeUndashed(
 	path iter.Seq[PathElement],
 	style Stroke,
 	tolerance float64,
-	opts StrokeOpts,
 ) iter.Seq[PathElement] {
 	return func(yield func(v PathElement) bool) {
 		ctx := strokeCtx{
@@ -176,7 +184,7 @@ func strokeUndashed(
 					q := QuadBez{p0, p1, p2}
 					tan0, tan1 := q.Tangents()
 					ctx.doJoin(style, tan0)
-					ctx.doCubic(style, q.Raise(), tolerance, opts)
+					ctx.doCubic(style, q.Raise(), tolerance)
 					ctx.lastTan = tan1
 				}
 			case CubicToKind:
@@ -185,7 +193,7 @@ func strokeUndashed(
 					c := CubicBez{p0, p1, p2, p3}
 					tan0, tan1 := c.Tangents()
 					ctx.doJoin(style, tan0)
-					ctx.doCubic(style, c, tolerance, opts)
+					ctx.doCubic(style, c, tolerance)
 					ctx.lastTan = tan1
 				}
 			case ClosePathKind:
@@ -330,7 +338,7 @@ func (ctx *strokeCtx) doLine(style Stroke, tangent Vec2, p1 Point) {
 	ctx.lastPt = p1
 }
 
-func (ctx *strokeCtx) doCubic(style Stroke, c CubicBez, tolerance float64, opts StrokeOpts) {
+func (ctx *strokeCtx) doCubic(style Stroke, c CubicBez, tolerance float64) {
 	// First, detect degenerate linear case
 
 	// Ordinarily, this is the direction of the chord, but if the chord is very
@@ -374,26 +382,15 @@ func (ctx *strokeCtx) doCubic(style Stroke, c CubicBez, tolerance float64, opts 
 		}
 	}
 
-	// A tuning parameter for regularization. A value too large may distort the curve,
-	// while a value too small may fail to generate smooth curves. This is a somewhat
-	// arbitrary value, and should be revisited.
-	const dimTune = 0.25
-	dimension := tolerance * dimTune
-	{
-		co := NewCubicOffset(c, -0.5*style.Width, dimension)
-		forward := fitWithOpts(&co, tolerance, opts)
-		for el := range dropFirst(forward) {
-			if ctx.dead {
-				break
-			}
-			ctx.doYield(el)
+	forward := offsetCubic(c, -0.5*style.Width, tolerance)
+	for el := range dropFirst(forward) {
+		if ctx.dead {
+			break
 		}
+		ctx.doYield(el)
 	}
-	{
-		co := NewCubicOffset(c, 0.5*style.Width, dimension)
-		backward := fitWithOpts(&co, tolerance, opts)
-		ctx.backwardPath = slices.AppendSeq(ctx.backwardPath, dropFirst(backward))
-	}
+	backward := offsetCubic(c, 0.5*style.Width, tolerance)
+	ctx.backwardPath = slices.AppendSeq(ctx.backwardPath, dropFirst(backward))
 	ctx.lastPt = c.P3
 }
 
@@ -517,23 +514,6 @@ func extendReversed(out *strokeCtx, elements []PathElement) {
 		default:
 			panic("unreachable")
 		}
-	}
-}
-
-func fitWithOpts(co *CubicOffset, tolerance float64, opts StrokeOpts) iter.Seq[PathElement] {
-	switch opts.OptLevel {
-	case Subdivide:
-		return FitToBezPath(co, tolerance)
-	case Optimized:
-		return func(yield func(PathElement) bool) {
-			for _, el := range FitToBezPathOpt(co, tolerance) {
-				if !yield(el) {
-					break
-				}
-			}
-		}
-	default:
-		return nil
 	}
 }
 

@@ -176,3 +176,23 @@ func (v Vec2) Negate() Vec2 {
 		Y: -v.Y,
 	}
 }
+
+// Turn90 turns the vector by 90 degrees.
+//
+// The rotation is clockwise in a Y-down coordinate system.
+func (v Vec2) Turn90() Vec2 {
+	return Vec2{-v.Y, v.X}
+}
+
+// rotateScale combines two vectors interpreted as rotation and scaling.
+//
+// Interpret both vectors as a rotation and a scale, and combine
+// their effects, by adding the angles and multiplying the magnitudes.
+// This operation is equivalent to multiplication when the vectors
+// are interpreted as complex numbers. It is commutative.
+func rotateScale(lhs, rhs Vec2) Vec2 {
+	return Vec2{
+		lhs.X*rhs.X - lhs.Y*rhs.Y,
+		lhs.X*rhs.Y + lhs.Y*rhs.X,
+	}
+}
