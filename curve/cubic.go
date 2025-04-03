@@ -92,15 +92,15 @@ func (c CubicBez) arclen(accuracy float64, depth int) float64 {
 		est = 0
 	}
 
-	estGauss8Error := min(math.Pow(est, 3)*2.5e-6, 3e-2) * lplc
+	estGauss8Error := min(pow3(est)*2.5e-6, 3e-2) * lplc
 	if estGauss8Error < accuracy {
 		return arclenQuadratureCore(gaussLegendreCoeffs8Half[:], dm, dm1, dm2)
 	}
-	estGauss16Error := min(math.Pow(est, 6)*1.5e-11, 9e-3) * lplc
+	estGauss16Error := min(pow6(est)*1.5e-11, 9e-3) * lplc
 	if estGauss16Error < accuracy {
 		return arclenQuadratureCore(gaussLegendreCoeffs16Half[:], dm, dm1, dm2)
 	}
-	estGauss24Error := min(math.Pow(est, 9)*3.5e-16, 3.5e-3) * lplc
+	estGauss24Error := min(pow9(est)*3.5e-16, 3.5e-3) * lplc
 	if estGauss24Error < accuracy || depth >= 20 {
 		return arclenQuadratureCore(gaussLegendreCoeffs24Half[:], dm, dm1, dm2)
 	}

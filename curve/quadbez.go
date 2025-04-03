@@ -263,7 +263,7 @@ func (q QuadBez) Tangents() (Vec2, Vec2) {
 // This is used for flattening curves.
 func approxParabolaIntegral(x float64) float64 {
 	const d = 0.67
-	return x / (1.0 - d + math.Sqrt(math.Sqrt(math.Pow(d, 4)+0.25*x*x)))
+	return x / (1.0 - d + math.Sqrt(math.Sqrt(pow4(d)+0.25*x*x)))
 }
 
 // An approximation to the inverse parabola integral.

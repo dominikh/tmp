@@ -279,7 +279,7 @@ func (aff Affine) svd() (scale Vec2, th float64) {
 	cd := c * d
 	th = math.Atan2(0.5*(2.0*(ab+cd)), a2-b2+c2-d2)
 	s1 := a2 + b2 + c2 + d2
-	s2 := math.Sqrt(math.Pow(a2-b2+c2-d2, 2) + 4.0*math.Pow(ab+cd, 2))
+	s2 := math.Sqrt(pow2(a2-b2+c2-d2) + 4.0*pow2(ab+cd))
 	return Vec2{
 		X: math.Sqrt(0.5 * (s1 + s2)),
 		Y: math.Sqrt(0.5 * (s1 - s2)),

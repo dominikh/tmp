@@ -189,7 +189,7 @@ func FitToCubic(
 			scaleF := func(d float64) float64 {
 				return 1.0 + max(d-dPenaltyElbow, 0.0)*dPenaltySlope
 			}
-			scale := math.Pow(max(scaleF(d0), scaleF(d1)), 2)
+			scale := pow2(max(scaleF(d0), scaleF(d1)))
 			err2 := err2 * scale
 			if err2 < acc2 && (!bestErr2.isSet || err2 < bestErr2.value) {
 				bestC.set(c)
