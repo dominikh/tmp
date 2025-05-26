@@ -138,7 +138,7 @@ type CAT struct {
 	FromCone [3][3]float64
 }
 
-func (cat *CAT) Adapt(xyz *[3]float64, src, dst Chromaticity) [3]float64 {
+func (cat *CAT) Adapt(xyz [3]float64, src, dst Chromaticity) [3]float64 {
 	m := cat.Matrix(src, dst)
 	return Adapt(xyz, &m)
 }
@@ -147,8 +147,8 @@ func (cat *CAT) Matrix(src, dst Chromaticity) [3][3]float64 {
 	ws := src.XYZ()
 	wd := dst.XYZ()
 
-	coneS := mulVecMat(&ws, &cat.ToCone)
-	coneD := mulVecMat(&wd, &cat.ToCone)
+	coneS := mulVecMat(ws, &cat.ToCone)
+	coneD := mulVecMat(wd, &cat.ToCone)
 
 	ρS := coneS[0]
 	γS := coneS[1]
@@ -179,6 +179,6 @@ func (cat *CAT) Matrix(src, dst Chromaticity) [3][3]float64 {
 	return mulMatMat(&m_, &cat.ToCone)
 }
 
-func Adapt(xyz *[3]float64, m *[3][3]float64) [3]float64 {
+func Adapt(xyz [3]float64, m *[3][3]float64) [3]float64 {
 	return mulVecMat(xyz, m)
 }

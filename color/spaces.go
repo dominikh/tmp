@@ -97,8 +97,8 @@ type Space struct {
 	White    Chromaticity
 	Base     *Space
 	Coords   [3]Coordinate
-	FromBase func(c *[3]float64) [3]float64
-	ToBase   func(c *[3]float64) [3]float64
+	FromBase func(c [3]float64) [3]float64
+	ToBase   func(c [3]float64) [3]float64
 
 	path []*Space
 }
@@ -186,11 +186,11 @@ func (cs *Space) Convert(to *Space, coords [3]float64) [3]float64 {
 
 	// Convert from our space to the connection space
 	for i := len(ourPath) - 1; i > connIdx; i-- {
-		coords = ourPath[i].ToBase(&coords)
+		coords = ourPath[i].ToBase(coords)
 	}
 	// Convert from connection space to destination space
 	for i := connIdx + 1; i < len(theirPath); i++ {
-		coords = theirPath[i].FromBase(&coords)
+		coords = theirPath[i].FromBase(coords)
 	}
 
 	return coords
@@ -212,10 +212,10 @@ func NewXYZSpace(name, id string, white Chromaticity) *Space {
 		Name:  name,
 		White: white,
 		Base:  XYZ_D65,
-		FromBase: func(c *[3]float64) [3]float64 {
+		FromBase: func(c [3]float64) [3]float64 {
 			return Adapt(c, &fromD65)
 		},
-		ToBase: func(c *[3]float64) [3]float64 {
+		ToBase: func(c [3]float64) [3]float64 {
 			return Adapt(c, &toD65)
 		},
 	}).Init()
@@ -295,10 +295,10 @@ func newRGBSpace(space *rgbSpace) *Space {
 		Name:   space.Name,
 		Coords: RGBCoordinates,
 		Base:   space.Base,
-		ToBase: func(c *[3]float64) [3]float64 {
+		ToBase: func(c [3]float64) [3]float64 {
 			return mulVecMat(c, &space.ToBase)
 		},
-		FromBase: func(c *[3]float64) [3]float64 {
+		FromBase: func(c [3]float64) [3]float64 {
 			return mulVecMat(c, &space.FromBase)
 		},
 	}).Init()
@@ -312,7 +312,7 @@ var SRGB = (&Space{
 	ID:   "srgb",
 	Name: "sRGB",
 	Base: LinearSRGB,
-	FromBase: func(c *[3]float64) [3]float64 {
+	FromBase: func(c [3]float64) [3]float64 {
 		f := func(ch float64) float64 {
 			var sign float64
 			if ch < 0 {
@@ -330,7 +330,7 @@ var SRGB = (&Space{
 		}
 		return [3]float64{f(c[0]), f(c[1]), f(c[2])}
 	},
-	ToBase: func(c *[3]float64) [3]float64 {
+	ToBase: func(c [3]float64) [3]float64 {
 		f := func(ch float64) float64 {
 			var sign float64
 			if ch < 0 {
@@ -386,7 +386,7 @@ var Oklab = (&Space{
 		{Name: "b", Range: infty, RefRange: [2]float64{-0.4, 0.4}},
 	},
 	Base: XYZ_D65,
-	FromBase: func(c *[3]float64) [3]float64 {
+	FromBase: func(c [3]float64) [3]float64 {
 		lms := mulVecMat(c, &oklabXyzToLms)
 
 		lms_ := [3]float64{
@@ -394,10 +394,10 @@ var Oklab = (&Space{
 			math.Cbrt(lms[1]),
 			math.Cbrt(lms[2]),
 		}
-		lab := mulVecMat(&lms_, &oklabLmsToLab)
+		lab := mulVecMat(lms_, &oklabLmsToLab)
 		return lab
 	},
-	ToBase: func(c *[3]float64) [3]float64 {
+	ToBase: func(c [3]float64) [3]float64 {
 		lms := mulVecMat(c, &oklabLabToLms)
 		lms_ := [3]float64{
 			lms[0] * lms[0] * lms[0],
@@ -405,7 +405,7 @@ var Oklab = (&Space{
 			lms[2] * lms[2] * lms[2],
 		}
 
-		xyz := mulVecMat(&lms_, &oklabLmsToXyz)
+		xyz := mulVecMat(lms_, &oklabLmsToXyz)
 		return xyz
 	},
 }).Init()
@@ -419,7 +419,7 @@ var Oklch = (&Space{
 		{Name: "Hue", Range: infty, IsAngle: true, RefRange: [2]float64{0, 360}},
 	},
 	Base: Oklab,
-	FromBase: func(c *[3]float64) [3]float64 {
+	FromBase: func(c [3]float64) [3]float64 {
 		return labToLCH(c, 0.8/1e5)
 	},
 	ToBase: LCh.ToBase,
@@ -434,7 +434,7 @@ var Lab = (&Space{
 		{Name: "b", Range: infty, RefRange: [2]float64{-125, 125}},
 	},
 	Base: XYZ_D50,
-	FromBase: func(c *[3]float64) [3]float64 {
+	FromBase: func(c [3]float64) [3]float64 {
 		const (
 			ϵ  = 216.0 / 24389.0
 			ϵ3 = 24.0 / 116.0
@@ -442,7 +442,7 @@ var Lab = (&Space{
 		)
 
 		white := WhitesCSSD50.XYZ()
-		xyz := *c
+		xyz := c
 		xyz[0] /= white[0]
 		xyz[1] /= white[1]
 		xyz[2] /= white[2]
@@ -464,7 +464,7 @@ var Lab = (&Space{
 
 		return [3]float64{l, a, b}
 	},
-	ToBase: func(c *[3]float64) [3]float64 {
+	ToBase: func(c [3]float64) [3]float64 {
 		const (
 			ϵ  = 216.0 / 24389.0
 			ϵ3 = 24.0 / 116.0
@@ -512,10 +512,10 @@ var LCh = (&Space{
 		{Name: "Hue", Range: infty, IsAngle: true, RefRange: [2]float64{0, 360}},
 	},
 	Base: Lab,
-	FromBase: func(c *[3]float64) [3]float64 {
+	FromBase: func(c [3]float64) [3]float64 {
 		return labToLCH(c, 250.0/1e5)
 	},
-	ToBase: func(cl *[3]float64) [3]float64 {
+	ToBase: func(cl [3]float64) [3]float64 {
 		// XXX handle achromatic h
 		l, c, h := cl[0], cl[1], cl[2]
 		if c < 0 {
@@ -527,7 +527,7 @@ var LCh = (&Space{
 	},
 }).Init()
 
-func labToLCH(lab *[3]float64, ϵ float64) [3]float64 {
+func labToLCH(lab [3]float64, ϵ float64) [3]float64 {
 	l, a, b := lab[0], lab[1], lab[2]
 	achromatic := math.Abs(a) < ϵ && math.Abs(b) < ϵ
 	var c, h float64
@@ -566,7 +566,7 @@ var ProPhoto = (&Space{
 	Name:   "ProPhoto",
 	Base:   LinearProPhoto,
 	Coords: RGBCoordinates,
-	ToBase: func(c *[3]float64) [3]float64 {
+	ToBase: func(c [3]float64) [3]float64 {
 		f := func(v float64) float64 {
 			var sign float64
 			if v < 0 {
@@ -587,7 +587,7 @@ var ProPhoto = (&Space{
 			f(c[2]),
 		}
 	},
-	FromBase: func(c *[3]float64) [3]float64 {
+	FromBase: func(c [3]float64) [3]float64 {
 		f := func(v float64) float64 {
 			var sign float64
 			if v < 0 {
@@ -633,7 +633,7 @@ var Rec2020 = (&Space{
 	Name:   "Rec. 2020",
 	Base:   LinearRec2020,
 	Coords: RGBCoordinates,
-	ToBase: func(c *[3]float64) [3]float64 {
+	ToBase: func(c [3]float64) [3]float64 {
 		f := func(v float64) float64 {
 			const b = 0.018053968510807
 			const a = 1 + 5.5*b
@@ -656,7 +656,7 @@ var Rec2020 = (&Space{
 			f(c[2]),
 		}
 	},
-	FromBase: func(c *[3]float64) [3]float64 {
+	FromBase: func(c [3]float64) [3]float64 {
 		f := func(v float64) float64 {
 			const b = 0.018053968510807
 			const a = 1 + 5.5*b
@@ -686,7 +686,7 @@ var Rec2100PQ = (&Space{
 	Name:   "Rec. 2100 PQ",
 	Base:   LinearRec2020,
 	Coords: RGBCoordinates,
-	ToBase: func(c *[3]float64) [3]float64 {
+	ToBase: func(c [3]float64) [3]float64 {
 		f := func(v float64) float64 {
 			const m1 = 2610.0 / 16384.0
 			const m2 = 128 * (2523.0 / 4096.0)
@@ -706,7 +706,7 @@ var Rec2100PQ = (&Space{
 			f(c[2]) / 203,
 		}
 	},
-	FromBase: func(c *[3]float64) [3]float64 {
+	FromBase: func(c [3]float64) [3]float64 {
 		f := func(v float64) float64 {
 			const m1 = 2610.0 / 16384.0
 			const m2 = 128 * (2523.0 / 4096.0)
@@ -726,7 +726,7 @@ var Rec2100PQ = (&Space{
 	},
 }).Init()
 
-func mulVecMat(vec *[3]float64, m *[3][3]float64) [3]float64 {
+func mulVecMat(vec [3]float64, m *[3][3]float64) [3]float64 {
 	return [3]float64{
 		m[0][0]*vec[0] + m[0][1]*vec[1] + m[0][2]*vec[2],
 		m[1][0]*vec[0] + m[1][1]*vec[1] + m[1][2]*vec[2],
