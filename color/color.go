@@ -158,6 +158,7 @@ package color
 import (
 	"fmt"
 	"iter"
+	"unsafe"
 )
 
 // Make is a convenience function for initializing colors.
@@ -266,11 +267,20 @@ func (c Color) Convert(space *Space) Color {
 		return c
 	}
 
-	v := c.Space.Convert(space, [3]float64(c.Values[:]))
-	return Color{
-		Values: [4]float64{v[0], v[1], v[2], c.Values[3]},
-		Space:  space,
-	}
+	// v := c.Space.Convert(space, [3]float64(c.Values[:]))
+	// return Color{
+	// 	Values: [4]float64{v[0], v[1], v[2], c.Values[3]},
+	// 	Space:  space,
+	// }
+
+	// This ridiculous unsafe code has the same effect as the above code, but
+	// lowers the function's complexity to 80, making it inlinable.
+	//
+	// We have to unsafely convert twice, because that has lower complexity than
+	// storing the result of the conversion and using it twice.
+	*(*[3]float64)(unsafe.Pointer(&c.Values)) = c.Space.Convert(space, *(*[3]float64)(unsafe.Pointer(&c.Values)))
+	c.Space = space
+	return c
 }
 
 // InGamut reports whether c's values are in gamut of its color space.
