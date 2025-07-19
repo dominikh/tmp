@@ -1,0 +1,18 @@
+version = 1
+
+[[annotations]]
+path = ["container/tinylfu/**"]
+SPDX-FileCopyrightText = "2021 Damian Gryski"
+SPDX-License-Identifier = "MIT"
+
+[[annotations]]
+path = ["container/tinylfu/internal/list/**"]
+SPDX-FileCopyrightText = "2009 The Go Authors."
+SPDX-License-Identifier = "BSD-3-Clause"
+
+[[annotations]]
+path = [
+  "**/testdata/fuzz/**",
+]
+SPDX-FileCopyrightText = "none"
+SPDX-License-Identifier = "CC0-1.0"
