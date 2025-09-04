@@ -16,13 +16,14 @@ func BenchmarkDash(b *testing.B) {
 	shape := Rect{X0: 5, Y0: 5, X1: 20, Y1: 20}.RoundedRect(RoundedRectRadii{2, 2, 2, 2})
 
 	for range b.N {
-		StrokePath(
+		for range StrokePath(
 			shape.PathElements(0.001),
 			DefaultStroke.
 				WithCaps(ButtCap).
 				WithDashes(0, []float64{0.1}),
 			StrokeOpts{},
-			0.01)
+			0.01) {
+		}
 	}
 }
 
