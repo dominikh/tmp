@@ -12,6 +12,8 @@ import (
 	"iter"
 	"math"
 	"slices"
+
+	"honnef.co/go/stuff/container/maybe"
 )
 
 type PathElementKind int
@@ -959,7 +961,7 @@ func Flatten(seq iter.Seq[PathElement], tolerance float64) iter.Seq[PathElement]
 		const toQuadTol = 0.1
 
 		sqrtTol := math.Sqrt(tolerance)
-		var lastPt option[Point]
+		var lastPt maybe.Option[Point]
 		quadBuf := []struct {
 			q      QuadBez
 			params flattenParams
@@ -967,18 +969,18 @@ func Flatten(seq iter.Seq[PathElement], tolerance float64) iter.Seq[PathElement]
 		for el := range seq {
 			switch el.Kind {
 			case MoveToKind:
-				lastPt.set(el.P0)
+				lastPt = maybe.Some(el.P0)
 				if !yield(el) {
 					return
 				}
 			case LineToKind:
-				lastPt.set(el.P0)
+				lastPt = maybe.Some(el.P0)
 				if !yield(el) {
 					return
 				}
 			case QuadToKind:
 				p1, p2 := el.P0, el.P1
-				if p0 := lastPt.value; lastPt.isSet {
+				if p0, ok := lastPt.Get(); ok {
 					q := QuadBez{p0, p1, p2}
 					params := q.estimateSubdiv(sqrtTol)
 					n := max(int(math.Ceil(0.5*params.val/sqrtTol)), 1)
@@ -995,10 +997,10 @@ func Flatten(seq iter.Seq[PathElement], tolerance float64) iter.Seq[PathElement]
 						return
 					}
 				}
-				lastPt.set(p2)
+				lastPt = maybe.Some(p2)
 			case CubicToKind:
 				p1, p2, p3 := el.P0, el.P1, el.P2
-				if p0 := lastPt.value; lastPt.isSet {
+				if p0, ok := lastPt.Get(); ok {
 					c := CubicBez{p0, p1, p2, p3}
 
 					// Subdivide into quadratics, and estimate the number of
@@ -1048,9 +1050,9 @@ func Flatten(seq iter.Seq[PathElement], tolerance float64) iter.Seq[PathElement]
 						return
 					}
 				}
-				lastPt.set(p3)
+				lastPt = maybe.Some(p3)
 			case ClosePathKind:
-				lastPt.clear()
+				lastPt = maybe.None[Point]()
 				if !yield(el) {
 					return
 				}

@@ -9,6 +9,8 @@ package curve
 import (
 	"iter"
 	"math"
+
+	"honnef.co/go/stuff/container/maybe"
 )
 
 // SplitArclen subdivides each subpath into segments of arc length l. Each group
@@ -58,10 +60,10 @@ func splitArclenMaxGroups(inner iter.Seq[PathSegment], l float64, n int) iter.Se
 	return func(yield func(PathSegment) bool) {
 		remainingLength := splitLength
 		remainingSegs := n
-		var prevEnd option[Point]
+		var prevEnd maybe.Option[Point]
 		var out []PathSegment
 		for seg := range inner {
-			if prevEnd.isSet && seg.P0 != prevEnd.value {
+			if v, ok := prevEnd.Get(); ok && seg.P0 != v {
 				// New subpath
 				remainingLength = splitLength
 				remainingSegs = n
@@ -71,11 +73,11 @@ func splitArclenMaxGroups(inner iter.Seq[PathSegment], l float64, n int) iter.Se
 			}
 			switch seg.Kind {
 			case LineKind:
-				prevEnd.set(seg.P1)
+				prevEnd = maybe.Some(seg.P1)
 			case QuadKind:
-				prevEnd.set(seg.P2)
+				prevEnd = maybe.Some(seg.P2)
 			case CubicKind:
-				prevEnd.set(seg.P3)
+				prevEnd = maybe.Some(seg.P3)
 			}
 
 			for {

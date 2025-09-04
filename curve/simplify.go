@@ -35,6 +35,8 @@ package curve
 import (
 	"iter"
 	"math"
+
+	"honnef.co/go/stuff/container/maybe"
 )
 
 type simplifyBezPath struct {
@@ -302,8 +304,8 @@ func Simplify(
 	options SimplifyOptions,
 ) iter.Seq[PathElement] {
 	return func(yield func(PathElement) bool) {
-		var lastPt option[Point]
-		var lastSeg option[PathSegment]
+		var lastPt maybe.Option[Point]
+		var lastSeg maybe.Option[PathSegment]
 		state := simplifyState{
 			accuracy: accuracy,
 			options:  options,
@@ -311,48 +313,48 @@ func Simplify(
 		}
 
 		for el := range path {
-			var thisSeg option[PathSegment]
+			var thisSeg maybe.Option[PathSegment]
 			switch el.Kind {
 			case MoveToKind:
 				state.flush()
 				state.needsMoveTo = true
-				lastPt.set(el.P0)
+				lastPt = maybe.Some(el.P0)
 			case LineToKind:
-				last := lastPt.unwrap()
+				last := lastPt.Unwrap()
 				if last == el.P0 {
 					continue
 				}
-				thisSeg.set(Line{last, el.P0}.Seg())
+				thisSeg = maybe.Some(Line{last, el.P0}.Seg())
 			case QuadToKind:
-				last := lastPt.unwrap()
+				last := lastPt.Unwrap()
 				if last == el.P0 && last == el.P1 {
 					continue
 				}
-				thisSeg.set(QuadBez{last, el.P0, el.P1}.Seg())
+				thisSeg = maybe.Some(QuadBez{last, el.P0, el.P1}.Seg())
 			case CubicToKind:
-				last := lastPt.unwrap()
+				last := lastPt.Unwrap()
 				if last == el.P0 && last == el.P1 && last == el.P2 {
 					continue
 				}
-				thisSeg.set(CubicBez{last, el.P0, el.P1, el.P2}.Seg())
+				thisSeg = maybe.Some(CubicBez{last, el.P0, el.P1, el.P2}.Seg())
 			case ClosePathKind:
 				state.flush()
 				if !yield(ClosePath()) {
 					return
 				}
 				state.needsMoveTo = true
-				lastSeg.clear()
+				lastSeg = maybe.None[PathSegment]()
 				continue
 			}
-			if seg := thisSeg.value; thisSeg.isSet {
-				if last := lastSeg.value; lastSeg.isSet {
+			if seg, ok := thisSeg.Get(); ok {
+				if last, ok := lastSeg.Get(); ok {
 					_, lastTan := last.Tangents()
 					thisTan, _ := seg.Tangents()
 					if math.Abs(lastTan.Cross(thisTan)) > math.Abs(lastTan.Dot(thisTan))*options.AngleThresh {
 						state.flush()
 					}
 				}
-				lastPt.set(seg.End())
+				lastPt = maybe.Some(seg.End())
 				state.addSegment(seg)
 			}
 			lastSeg = thisSeg

@@ -10,6 +10,8 @@ import (
 	"fmt"
 	"iter"
 	"math"
+
+	"honnef.co/go/stuff/container/maybe"
 )
 
 // As described in [Simplifying Bézier paths], strictly optimizing for
@@ -177,8 +179,8 @@ func FitToCubic(
 	chord := math.Sqrt(chord2)
 	aff := Translate(Vec2(start.Point)).Mul(Rotate(th)).Mul(Scale(chord, chord))
 	curveDist := curveDistFromCurve(source, rangeStart, rangeEnd)
-	var bestC option[CubicBez]
-	var bestErr2 option[float64]
+	var bestC maybe.Option[CubicBez]
+	var bestErr2 maybe.Option[float64]
 	fits, fitsN := cubicFit(th0, th1, unitArea, mx)
 	for _, cfit := range fits[:fitsN] {
 		cand := cfit.cbez
@@ -191,14 +193,14 @@ func FitToCubic(
 			}
 			scale := pow2(max(scaleF(d0), scaleF(d1)))
 			err2 := err2 * scale
-			if err2 < acc2 && (!bestErr2.isSet || err2 < bestErr2.value) {
-				bestC.set(c)
-				bestErr2.set(err2)
+			if err2 < acc2 && (!bestErr2.Set() || err2 < bestErr2.Unwrap()) {
+				bestC = maybe.Some(c)
+				bestErr2 = maybe.Some(err2)
 			}
 		}
 	}
-	if bestC.isSet && bestErr2.isSet {
-		return bestC.value, bestErr2.value, true
+	if bestC.Set() && bestErr2.Set() {
+		return bestC.Unwrap(), bestErr2.Unwrap(), true
 	} else {
 		return CubicBez{}, 0, false
 	}
@@ -711,20 +713,20 @@ type curveDist struct {
 
 func curveDistFromCurve(source FittableCurve, rangeStart, rangeEnd float64) curveDist {
 	step := (rangeEnd - rangeStart) * (1.0 / float64(numSamples+1))
-	var lastTan option[Vec2]
+	var lastTan maybe.Option[Vec2]
 	spicy := false
 	const spicyThresh = 0.2
 	var samples [numSamples]CurveFitSample
 	for i := range numSamples + 2 {
 		sample := source.SamplePtTangent(rangeStart+float64(i)*step, 1.0)
-		if lastTan.isSet {
-			cross := sample.Tangent.Cross(lastTan.value)
-			dot := sample.Tangent.Dot(lastTan.value)
+		if tan, ok := lastTan.Get(); ok {
+			cross := sample.Tangent.Cross(tan)
+			dot := sample.Tangent.Dot(tan)
 			if math.Abs(cross) > spicyThresh*math.Abs(dot) {
 				spicy = true
 			}
 		}
-		lastTan.set(sample.Tangent)
+		lastTan = maybe.Some(sample.Tangent)
 		if i > 0 && i < numSamples+1 {
 			samples[i-1] = sample
 		}

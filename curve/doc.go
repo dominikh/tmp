@@ -103,7 +103,7 @@
 // representations.
 //
 // The package supports [MoveTo], [LineTo], [QuadTo], [CubicTo], and [ClosePath]
-// line elements, and correspondingly has path segments for lines, quadratic
+// path elements, and correspondingly has path segments for lines, quadratic
 // Béziers, and cubic Béziers.
 //
 // # Cubic Béziers

@@ -11,6 +11,8 @@ import (
 	"math"
 	"slices"
 	"sort"
+
+	"honnef.co/go/stuff/container/maybe"
 )
 
 const maxSplineSplit = 100
@@ -368,17 +370,17 @@ func (c CubicBez) Transform(aff Affine) CubicBez {
 
 // Nearest finds the nearest point, using subdivision.
 func (c CubicBez) Nearest(pt Point, accuracy float64) (distSq, t float64) {
-	var bestR option[float64]
+	var bestR maybe.Option[float64]
 	bestT := 0.0
 	for qq := range c.Quadratics(accuracy) {
 		t0, t1, q := qq.Start, qq.End, qq.Segment
 		qDistSq, qT := q.Nearest(pt, accuracy)
-		if !bestR.isSet || qDistSq < bestR.value {
+		if n, ok := bestR.Get(); !ok || qDistSq < n {
 			bestT = t0 + qT*(t1-t0)
-			bestR.set(qDistSq)
+			bestR = maybe.Some(qDistSq)
 		}
 	}
-	return bestR.value, bestT
+	return bestR.UnwrapOr(0), bestT
 }
 
 func (c CubicBez) SignedArea() float64 {

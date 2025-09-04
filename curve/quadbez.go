@@ -10,6 +10,8 @@ import (
 	"iter"
 	"math"
 	"slices"
+
+	"honnef.co/go/stuff/container/maybe"
 )
 
 var _ Shape = QuadBez{}
@@ -179,10 +181,10 @@ func (q QuadBez) Extrema() ([MaxExtrema]float64, int) {
 
 func (q QuadBez) Nearest(pt Point, accuracy float64) (distSq, outT float64) {
 	// Find the nearest point, using analytical algorithm based on cubic root finding.
-	evalT := func(pt Point, tBest *float64, rBest *option[float64], t float64, p0 Point) {
+	evalT := func(pt Point, tBest *float64, rBest *maybe.Option[float64], t float64, p0 Point) {
 		r := p0.Sub(pt).Hypot2()
-		if !rBest.isSet || r < rBest.value {
-			rBest.set(r)
+		if v, ok := rBest.Get(); !ok || r < v {
+			*rBest = maybe.Some(r)
 			*tBest = t
 		}
 	}
@@ -190,7 +192,7 @@ func (q QuadBez) Nearest(pt Point, accuracy float64) (distSq, outT float64) {
 		q *QuadBez,
 		pt Point,
 		tBest *float64,
-		rBest *option[float64],
+		rBest *maybe.Option[float64],
 		t float64,
 	) bool {
 		if !(t >= 0.0 && t <= 1.0) {
@@ -207,7 +209,7 @@ func (q QuadBez) Nearest(pt Point, accuracy float64) (distSq, outT float64) {
 	c2 := 3.0 * d1.Dot(d0)
 	c3 := d1.Hypot2()
 	roots, n := SolveCubic(c0, c1, c2, c3)
-	var rBest option[float64]
+	var rBest maybe.Option[float64]
 	tBest := 0.0
 	needEnds := n == 0
 
@@ -222,7 +224,7 @@ func (q QuadBez) Nearest(pt Point, accuracy float64) (distSq, outT float64) {
 		evalT(pt, &tBest, &rBest, 1.0, q.P2)
 	}
 
-	return rBest.value, tBest
+	return rBest.UnwrapOr(0), tBest
 }
 
 func (q QuadBez) Transform(aff Affine) QuadBez {

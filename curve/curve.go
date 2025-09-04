@@ -13,6 +13,8 @@ import (
 	"math"
 	"strconv"
 	"strings"
+
+	"honnef.co/go/stuff/container/maybe"
 )
 
 // MaxExtrema is the maximum number of extrema that can be reported by
@@ -166,10 +168,10 @@ func expand(f float64) float64 {
 // Elements converts a sequence of path segments to a sequence of path elements.
 func Elements(seq iter.Seq[PathSegment]) iter.Seq[PathElement] {
 	return func(yield func(PathElement) bool) {
-		var currentPos option[Point]
+		var currentPos maybe.Option[Point]
 		for seg := range seq {
 			start := seg.Start()
-			if !currentPos.isSet || currentPos.value != start {
+			if curPos, ok := currentPos.Get(); !ok || curPos != start {
 				if !yield(MoveTo(start)) {
 					return
 				}
@@ -177,7 +179,7 @@ func Elements(seq iter.Seq[PathSegment]) iter.Seq[PathElement] {
 			if !yield(seg.PathElement()) {
 				return
 			}
-			currentPos.set(seg.End())
+			currentPos = maybe.Some(seg.End())
 		}
 	}
 }
@@ -449,27 +451,27 @@ func depressedCubicDominant(g float64, h float64) float64 {
 	q := (-1.0 / 3.0) * g
 	r := 0.5 * h
 	var phi0 float64
-	var k option[float64]
+	var k maybe.Option[float64]
 	if math.Abs(q) < 1e102 && math.Abs(r) < 1e154 {
-		k.clear()
+		k = maybe.None[float64]()
 	} else if math.Abs(q) < math.Abs(r) {
-		k.set(1.0 - q*((q/r)*(q/r)))
+		k = maybe.Some(1.0 - q*((q/r)*(q/r)))
 	} else {
 		v := ((r/q)*(r/q))/q - 1.0
 		if math.Signbit(q) {
 			v = -v
 		}
-		k.set(v)
+		k = maybe.Some(v)
 	}
-	if k.isSet && r == 0.0 {
+	if k.Set() && r == 0.0 {
 		if g > 0.0 {
 			phi0 = 0.0
 		} else {
 			phi0 = math.Sqrt(-g)
 		}
-	} else if k.isSet && k.value < 0.0 || !k.isSet && r*r < q*q*q {
+	} else if kv, ok := k.Get(); ok && kv < 0.0 || !ok && r*r < q*q*q {
 		var t float64
-		if k.isSet {
+		if k.Set() {
 			t = r / q / math.Sqrt(q)
 		} else {
 			t = r / math.Sqrt(q*q*q)
@@ -477,11 +479,11 @@ func depressedCubicDominant(g float64, h float64) float64 {
 		phi0 = -2.0 * math.Sqrt(q) * math.Copysign(math.Cos(math.Acos(math.Abs(t))*(1.0/3.0)), t)
 	} else {
 		var a float64
-		if k.isSet {
+		if kv, ok := k.Get(); ok {
 			if math.Abs(q) < math.Abs(r) {
-				a = -r * (1.0 + math.Sqrt(k.value))
+				a = -r * (1.0 + math.Sqrt(kv))
 			} else {
-				a = -r - math.Copysign(math.Sqrt(math.Abs(q))*q*math.Sqrt(k.value), r)
+				a = -r - math.Copysign(math.Sqrt(math.Abs(q))*q*math.Sqrt(kv), r)
 			}
 		} else {
 			a = -r - math.Copysign(math.Sqrt(r*r-q*q*q), r)
@@ -933,28 +935,6 @@ func solveITPFallible[E any](
 		scaledEpsilon *= 0.5
 	}
 	return result[[2]float64, E]{isOK: true, ok: [2]float64{a, b}}
-}
-
-type option[T any] struct {
-	isSet bool
-	value T
-}
-
-func (opt *option[T]) set(v T) {
-	opt.isSet = true
-	opt.value = v
-}
-
-func (opt *option[T]) clear() {
-	opt.isSet = false
-	opt.value = *new(T)
-}
-
-func (opt *option[T]) unwrap() T {
-	if !opt.isSet {
-		panic("option isn't set")
-	}
-	return opt.value
 }
 
 // FactorQuarticInner factors a quartic into two quadratics.

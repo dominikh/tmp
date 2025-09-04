@@ -6,7 +6,11 @@
 
 package curve
 
-import "math"
+import (
+	"math"
+
+	"honnef.co/go/stuff/container/maybe"
+)
 
 //! Minimum distance between two Bézier curves
 //!
@@ -50,17 +54,17 @@ func minDistParam(
 
 	// Property one: D(r>k) > alpha
 	isOutside := true
-	var minDrk option[float64]
-	var minIj option[[2]int]
+	var minDrk maybe.Option[float64]
+	var minIj maybe.Option[[2]int]
 	for r := range 2 * n {
 		for k := range 2 * m {
 			dRk := dRk(r, k, bez1, bez2)
 			if dRk < alpha {
 				isOutside = false
 			}
-			if !minDrk.isSet || dRk < minDrk.value {
-				minDrk.set(dRk)
-				minIj.set([2]int{r, k})
+			if v, ok := minDrk.Get(); !ok || dRk < v {
+				minDrk = maybe.Some(dRk)
+				minIj = maybe.Some([2]int{r, k})
 			}
 		}
 	}
@@ -107,7 +111,7 @@ func minDistParam(
 		return svalues[3]
 	}
 
-	minI, minJ := minIj.unwrap()[0], minIj.unwrap()[1]
+	minI, minJ := minIj.Unwrap()[0], minIj.Unwrap()[1]
 	newUmid := umin + (umax-umin)*(float64(minI)/float64(2*n))
 	newVmid := vmin + (vmax-vmin)*(float64(minJ)/float64(2*m))
 
