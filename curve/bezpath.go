@@ -42,22 +42,20 @@ type PathElement struct {
 }
 
 func (el PathElement) String() string {
-	var kind string
 	switch el.Kind {
 	case MoveToKind:
-		kind = "MoveTo"
+		return fmt.Sprintf("MoveTo(%s)", el.P0)
 	case LineToKind:
-		kind = "LineTo"
+		return fmt.Sprintf("LineTo(%s)", el.P0)
 	case QuadToKind:
-		kind = "QuadTo"
+		return fmt.Sprintf("QuadTo(%s, %s)", el.P0, el.P1)
 	case CubicToKind:
-		kind = "CubicTo"
+		return fmt.Sprintf("CubicTo(%s, %s, %s)", el.P0, el.P1, el.P2)
 	case ClosePathKind:
-		kind = "ClosePath"
+		return "ClosePath()"
 	default:
-		kind = "InvalidPathElement"
+		return fmt.Sprintf("InvalidPathElement(%s, %s, %s)", el.P0, el.P1, el.P2)
 	}
-	return fmt.Sprintf("%s(%s, %s, %s)", kind, el.P0, el.P1, el.P2)
 }
 
 func (el PathElement) Transform(aff Affine) PathElement {
