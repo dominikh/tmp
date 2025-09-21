@@ -14,3 +14,5 @@ golang.org/x/sys v0.31.0 h1:ioabZlmFYtWhL+TRYpcnNlLwhyxaM9kWTDEmfnprqik=
 golang.org/x/sys v0.31.0/go.mod h1:BJP2sWEmIv4KK5OTEluFJCKSidICx8ciO85XgH3Ak8k=
 golang.org/x/tools v0.31.0 h1:0EedkvKDbh+qistFTd0Bcwe/YLh4vHwWEkiI0toFIBU=
 golang.org/x/tools v0.31.0/go.mod h1:naFTU+Cev749tSJRXJlna0T3WxKvb1kWEx15xA4SdmQ=
+honnef.co/go/safeish v0.0.0-20241114181457-67c0a2c357ad h1:6/Sl5Rx44C28ylGrKNEejIzrS2MbtLCdPsp47T6J3kg=
+honnef.co/go/safeish v0.0.0-20241114181457-67c0a2c357ad/go.mod h1:6TmSwH8eepkcwN0dPPAkTpxwjEJzgJq5Bv2HD3HHAP8=
