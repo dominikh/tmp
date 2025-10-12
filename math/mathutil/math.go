@@ -109,3 +109,21 @@ func ReferenceULPDiff(ref *big.Float, b float64) float64 {
 	ret, _ := fulp.Float64()
 	return float64(iulp) + ret
 }
+
+// Det2x2 computes 𝑎𝑑 − 𝑏𝑐 while avoiding loss of precision due to catastrophic
+// cancellation, assuming no underflow or overflow occurs.
+func Det2x2(a, b, c, d float64) float64 {
+	// This is Kahan's algorithm for computing the determinant. See "Further
+	// analysis of Kahan's algorithm for the accurate computation of 2 x 2
+	// determinants" for details.
+
+	// compute rounded bc
+	w := b * c
+	// compute error introduced by rounding bc; this error is exact
+	e := math.FMA(-b, c, w)
+	// compute exact ad, subtract rounded bc, round result
+	f := math.FMA(a, d, -w)
+	// add error of rounding bc. result is roughly as accurate as doing all
+	// steps in float128 precision and then rounding to float64.
+	return f + e
+}
