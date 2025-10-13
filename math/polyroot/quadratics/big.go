@@ -8,9 +8,12 @@ import (
 	"math/big"
 )
 
-// BigFloat is a copy of [Goualard] that uses [big.Float] instead of float64 for
-// its inputs, outputs, and computations. Its main purpose is to produce
-// reference values for tests.
+// BigFloat is a solver that works on [big.Float] instead of float64. It uses
+// the same logic as [Goualard] for handling edge cases, but uses
+// straightforward big math instead of manually manipulating mantissas and
+// exponents.
+//
+// Its main purpose is to produce reference values for tests.
 //
 // As big.Float doesn't support NaN, BigFloat returns nil big.Floats instead of
 // NaN for invalid roots.
@@ -43,9 +46,6 @@ func BigFloat(a, b, c *big.Float) (r1, r2 *big.Float, n int) {
 				return new(big.Float), nil, 1
 			} else {
 				// a == 0, b != 0, c != 0
-
-				// The over-/underflow in -c / b is unavoidable and means we
-				// cannot represent the solution.
 				r := new(big.Float)
 				r.Neg(c)
 				r.Quo(r, b)
@@ -53,12 +53,11 @@ func BigFloat(a, b, c *big.Float) (r1, r2 *big.Float, n int) {
 			}
 		}
 	case b.Sign() == 0:
-		if c.Sign() == 0 {
-			// a != 0, b == c == 0
+		if c.Sign() == 0 { // a != 0, b == c == 0
 
 			// Zero is the only solution
 			return new(big.Float), nil, 1
-		} else {
+		} else { // a != 0, b == 0, c != 0
 			if a.Signbit() == c.Signbit() {
 				// The only solutions are two complex numbers. We don't
 				// differentiate between "no roots" and "no real roots" and thus
@@ -67,23 +66,13 @@ func BigFloat(a, b, c *big.Float) (r1, r2 *big.Float, n int) {
 
 				return nil, nil, 0
 			} else {
-				fracA := new(big.Float)
-				fracC := new(big.Float)
-				expA := a.MantExp(fracA)
-				expC := c.MantExp(fracC)
-
-				ecp := expC - expA
-				dM := ecp &^ 1 // dM = floor(ecp/2)*2
-				M := dM / 2
-				E := ecp & 1 // E = odd(ecp) ? 1 : 0
-
-				c3 := new(big.Float).SetMantExp(fracC, E)
-				S := new(big.Float)
-				S.Neg(c3)
-				S.Quo(S, fracA)
-				S.Sqrt(S)
-				x1 := new(big.Float).SetMantExp(S, M)
-				return new(big.Float).Neg(x1), x1, 2
+				// ±√(−4𝑎𝑐) ∕ 2𝑎
+				r1 := new(big.Float).Quo(
+					new(big.Float).Sqrt(
+						new(big.Float).Mul(big.NewFloat(-4), new(big.Float).Mul(a, c))),
+					new(big.Float).Mul(big.NewFloat(2), a))
+				r2 := new(big.Float).Neg(r1)
+				return r2, r1, 2
 			}
 		}
 	case c.Sign() == 0:
@@ -107,93 +96,51 @@ func BigFloat(a, b, c *big.Float) (r1, r2 *big.Float, n int) {
 		// (This is in the default case, not outside the switch, so that the
 		// compiler will yell at us if any of the cases have paths where we
 		// don't return from the function.)
-		fracA := new(big.Float)
-		fracB := new(big.Float)
-		fracC := new(big.Float)
-		expA := a.MantExp(fracA)
-		expB := b.MantExp(fracB)
-		expC := c.MantExp(fracC)
-		K := expB - expA
-		L := expA - 2*expB
-		ecp := expC + L
-		if ecp >= -920 && ecp < 995 {
-			c2 := new(big.Float).SetMantExp(fracC, ecp)
-			// 4*fracA
-			tmp := new(big.Float).Add(fracA, fracA)
-			tmp.Add(tmp, tmp)
-			disc := bigDet2x2(fracB, fracB, tmp, c2)
-			switch disc.Sign() {
-			case -1:
-				// No real solutions. Similar to above, we return nothing and don't
-				// differentiate reasons for the lack of real roots.
-				return nil, nil, 0
-			case 1:
-				// y1 := -(2 * c2) / (fracB + math.Copysign(math.Sqrt(disc), b))
-				xxx := new(big.Float).Sqrt(disc)
-				if xxx.Signbit() != b.Signbit() {
-					xxx.Neg(xxx)
-				}
-				xxx.Add(fracB, xxx)
 
-				y1 := new(big.Float).Add(c2, c2)
-				y1.Neg(y1)
-				y1.Quo(y1, xxx)
+		// Use −𝑏 ± √(Δ) ∕ 2𝑎 and 2𝑐 ∕ −𝑏 ∓ √(Δ) with the same sign to compute
+		// both roots while avoiding catastrophic cancellation.
 
-				// y2 := -(fracB + math.Copysign(math.Sqrt(disc), b)) / (2 * fracA)
-				y2 := new(big.Float).Neg(xxx)
-				y2.Quo(y2, new(big.Float).Add(fracA, fracA))
-
-				x1 := new(big.Float).SetMantExp(y1, K)
-				x2 := new(big.Float).SetMantExp(y2, K)
-				if x1.Cmp(x2) == -1 {
-					return x1, x2, 2
-				} else {
-					return x2, x1, 2
-				}
-			default: // disc == 0
-				return new(big.Float).SetMantExp(
-					new(big.Float).Quo(
-						new(big.Float).Neg(fracB),
-						new(big.Float).Add(fracA, fracA),
-					), K), nil, 1
-			}
-		} else {
-			dM := ecp &^ 1 // dM = floor(ecp/2)*2
-			M := dM / 2
-			E := ecp & 1 // E = odd(ecp) ? 1 : 0
-			c3 := new(big.Float).SetMantExp(fracC, E)
-			S := new(big.Float)
-			S.Quo(c3, fracA)
-			S.Abs(S)
-			S.Sqrt(S)
-			if ecp < -920 {
-				y1 := new(big.Float).Quo(
-					new(big.Float).Neg(fracB),
-					fracA,
-				)
-				y2 := new(big.Float).Quo(
-					c3,
-					new(big.Float).Mul(fracA, y1),
-				)
-				x1 := new(big.Float).SetMantExp(y1, K)
-				x2 := new(big.Float).SetMantExp(y2, dM+K)
-				if x1.Cmp(x2) == -1 {
-					return x1, x2, 2
-				} else {
-					return x2, x1, 2
-				}
+		tmp := new(big.Float).Mul(big.NewFloat(4), a)
+		disc := bigDet2x2(b, b, tmp, c)
+		switch disc.Sign() {
+		case -1:
+			// No real solutions. Similar to above, we return nothing and don't
+			// differentiate reasons for the lack of real roots.
+			return nil, nil, 0
+		case 1:
+			sqrtDisc := new(big.Float).Sqrt(disc)
+			var comp *big.Float
+			if b.Signbit() {
+				// −𝑏 − sign(𝑏)×√(Δ) = |𝑏| + √(Δ)
+				comp = new(big.Float).Add(
+					new(big.Float).Abs(b),
+					sqrtDisc)
 			} else {
-				// ecp >= 995
-				if a.Signbit() == c.Signbit() {
-					// No real solutions. Similar to above, we return nothing and don't
-					// differentiate reasons for the lack of real roots.
-					return nil, nil, 0
-				} else {
-					x1 := new(big.Float).SetMantExp(S, M+K)
-					x2 := new(big.Float).Neg(x1)
-					return x2, x1, 2
-				}
+				// −𝑏 − sign(𝑏)×√(Δ) = −𝑏 − √(Δ) = −(𝑏 + √(Δ))
+				comp = new(big.Float).Add(b, sqrtDisc)
+				comp.Neg(comp)
 			}
+			// r1 := (2 * c) / comp // citardauq
+			r1 := new(big.Float).Quo(
+				new(big.Float).Mul(big.NewFloat(2), c),
+				comp)
+			// r2 := comp / (2 * a) // quadratic
+			r2 := new(big.Float).Quo(
+				comp,
+				new(big.Float).Mul(big.NewFloat(2), a))
+			if r1.Cmp(r2) == -1 {
+				return r1, r2, 2
+			} else {
+				return r2, r1, 2
+			}
+		default: // disc == 0
+			r := new(big.Float).Quo(
+				b,
+				new(big.Float).Mul(
+					big.NewFloat(2),
+					a))
+			r.Neg(r)
+			return r, nil, 1
 		}
 	}
 }
