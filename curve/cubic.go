@@ -12,7 +12,7 @@ import (
 	"slices"
 	"sort"
 
-	"honnef.co/go/stuff/container/maybe"
+	"honnef.co/go/stuff/math/polyroot"
 )
 
 const maxSplineSplit = 100
@@ -345,19 +345,47 @@ func (c CubicBez) Transform(aff Affine) CubicBez {
 	}
 }
 
-// Nearest finds the nearest point, using subdivision.
+// Nearest finds the nearest point, using a quintic solver.
 func (c CubicBez) Nearest(pt Point, accuracy float64) (distSq, t float64) {
-	var bestR maybe.Option[float64]
-	bestT := 0.0
-	for qq := range c.Quadratics(accuracy) {
-		t0, t1, q := qq.Start, qq.End, qq.Segment
-		qDistSq, qT := q.Nearest(pt, accuracy)
-		if n, ok := bestR.Get(); !ok || qDistSq < n {
-			bestT = t0 + qT*(t1-t0)
-			bestR = maybe.Some(qDistSq)
+	var (
+		tBest float64
+		rBest = math.Inf(1)
+	)
+	evalT := func(pt Point, t float64, p0 Point) {
+		r := p0.Sub(pt).Hypot2()
+		if r < rBest {
+			rBest = r
+			tBest = t
 		}
 	}
-	return bestR.UnwrapOr(0), bestT
+
+	// Reparameterize 'c - p' as 'q0 + q1 t + q2 t² + q3 t³'.
+	q0 := c.P0.Sub(pt)
+	q1 := (c.P1.Sub(c.P0)).Mul(3.0)
+	q2 := (Vec2(c.P0).Sub(Vec2(c.P1).Mul(2)).Add(Vec2(c.P2))).Mul(3)
+	q3 := Vec2(c.P0).Negate().Add(Vec2(c.P1).Mul(3)).Sub(Vec2(c.P2).Mul(3)).Add(Vec2(c.P3))
+
+	// Coefficients of the degree-5 polynomial (c - p) · tangent.
+	c0 := q0.Dot(q1)
+	c1 := q1.Hypot2() + 2.0*q2.Dot(q0)
+	c2 := 3.0 * (q2.Dot(q1) + q3.Dot(q0))
+	c3 := 4.0*q3.Dot(q1) + 2.0*q2.Hypot2()
+	c4 := 5.0 * q3.Dot(q2)
+	c5 := 3.0 * q3.Hypot2()
+
+	roots := polyroot.NewPolynomial(c0, c1, c2, c3, c4, c5).Roots(0, 1, accuracy, nil)
+
+	for _, t := range roots {
+		evalT(pt, t, c.Eval(t))
+	}
+
+	// If we found all 5 critical points, we can skip evaluating the endpoints.
+	if len(roots) != 5 {
+		evalT(pt, 0.0, c.P0)
+		evalT(pt, 1.0, c.P3)
+	}
+
+	return rBest, tBest
 }
 
 func (c CubicBez) SignedArea() float64 {
