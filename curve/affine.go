@@ -267,6 +267,8 @@ func (aff Affine) IsNaN() bool {
 // First part of the return tuple is the scaling, second part is the angle of rotation (in
 // radians)
 func (aff Affine) svd() (scale Vec2, th float64) {
+	// OPT(dh): if svd ever begins to inline, we should switch the computation
+	// of the scale over to the algorithm used in svd0.
 	a := aff.N0
 	a2 := a * a
 	b := aff.N1
@@ -292,20 +294,47 @@ func (aff Affine) svd0() Vec2 {
 	// OPT(dh): if [Affine.svd] were inlined and dead code got eliminated, we
 	// wouldn't need svd0.
 	a := aff.N0
-	a2 := a * a
 	b := aff.N1
-	b2 := b * b
 	c := aff.N2
-	c2 := c * c
 	d := aff.N3
-	d2 := d * d
-	ab := a * b
-	cd := c * d
-	s1 := a2 + b2 + c2 + d2
-	s2 := math.Sqrt(pow2(a2-b2+c2-d2) + 4.0*pow2(ab+cd))
+	// Given matrix A = [ a c ]
+	//                  [ b d ]
+	//
+	// The two singular values σ1, σ2 of A are the square roots of the two eigen values λ1, λ2
+	// of M = A^T A. The common formula for 2x2 eigenvalues requires evaluating a square root,
+	// but we'd like to compute the singular values of the matrix without nested square roots.
+	//
+	// M = A^T A = [ aa+cc   ab+cd ]
+	//             [ ab+cd   bb+dd ]
+	//
+	// We have
+	// λ = 1/2 (tr(M) ± sqrt(tr(M)^2 - 4 det(M))).
+	//
+	// Note det(M) = det(A^T A) = det(A)^2.
+	// => 2λ = tr(M) ± sqrt(tr(M)^2 - 4 det(A)^2)
+	// => 2λ = tr(M) ± sqrt[(a^2+b^2+c^2+d^2)^2 - 4 (ad-bc)^2]
+	// By factorizing the inner term,
+	// => 2λ = tr(M) ± sqrt[((a+d)^2 + (b-c)^2) ((a-d)^2 + (b+c)^2)]
+	// => 2λ = tr(M) ± sqrt[(a+d)^2 + (b-c)^2] sqrt[(a-d)^2 + (b+c)^2]
+	//
+	// Define S1 = sqrt[(a+d)^2 + (b-c)^2]
+	//        S2 = sqrt[(a-d)^2 + (b+c)^2].
+	//
+	// => 2λ = tr(M) ± S1 S2
+	// => 2λ = 1/2 (S1^2 + S2^2) ± S1 S2
+	// => λ = 1/4 (S1^2 + S2^2 ± 2 S1 S2)
+	// => λ = 1/4 (S1 ± S2)^2
+	//
+	// Note we're interested in
+	// σ = sqrt(λ).
+	//
+	// => σ1 = 1/2 (S1 + S2)
+	// and similarly σ2 = 1/2 |S1 - S2|
+	s1 := math.Sqrt((pow2(a+d) + pow2(b-c)))
+	s2 := math.Sqrt((pow2(a-d) + pow2(b+c)))
 	return Vec2{
-		X: math.Sqrt(0.5 * (s1 + s2)),
-		Y: math.Sqrt(0.5 * (s1 - s2)),
+		X: 0.5 * (s1 + s2),
+		Y: 0.5 * math.Abs(s1-s2),
 	}
 }
 
