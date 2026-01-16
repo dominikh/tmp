@@ -62,7 +62,7 @@ func (e Ellipse) WithCenter(center Point) Ellipse {
 
 // WithRadii returns a new ellipse, with the radii replaced by the argument.
 func (e Ellipse) WithRadii(radii Vec2) Ellipse {
-	_, rotation := e.inner.svd()
+	rotation := e.inner.svd1()
 	translation := e.inner.Translation()
 	return newEllipse(translation, radii.X, radii.Y, rotation)
 }
@@ -73,7 +73,7 @@ func (e Ellipse) WithRadii(radii Vec2) Ellipse {
 // The rotation is clockwise, for a y-down coordinate system. For more
 // on rotation, See [Rotate].
 func (e Ellipse) WithRotation(rotation float64) Ellipse {
-	scale, _ := e.inner.svd()
+	scale := e.inner.svd0()
 	translation := e.inner.Translation()
 	return newEllipse(translation, scale.X, scale.Y, rotation)
 }
@@ -185,13 +185,13 @@ func (e Ellipse) Center() Point {
 // The first number is the horizontal radius and the second is the
 // vertical radius, before rotation.
 func (e Ellipse) Radii() Vec2 {
-	radii, _ := e.inner.svd()
+	radii := e.inner.svd0()
 	return radii
 }
 
 // Rotation returns the ellipse's rotation, in radians.
 func (e Ellipse) Rotation() float64 {
-	_, rot := e.inner.svd()
+	rot := e.inner.svd1()
 	return rot
 }
 

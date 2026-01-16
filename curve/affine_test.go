@@ -182,6 +182,16 @@ func TestAffine_svd(t *testing.T) {
 			if !cmp.Equal(got2, tt.want2, cmpopts.EquateApprox(0, 1e-6)) {
 				t.Errorf("svd() = %v, want %v", got2, tt.want2)
 			}
+
+			got = tt.aff.svd0()
+			if !cmp.Equal(got, tt.want, cmpopts.EquateApprox(0, 1e-6)) {
+				t.Errorf("svd0() = %v, want %v", got, tt.want)
+			}
+
+			got2 = tt.aff.svd1()
+			if !cmp.Equal(got2, tt.want2, cmpopts.EquateApprox(0, 1e-6)) {
+				t.Errorf("svd() = %v, want %v", got2, tt.want2)
+			}
 		})
 	}
 

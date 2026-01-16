@@ -286,6 +286,48 @@ func (aff Affine) svd() (scale Vec2, th float64) {
 	}, th
 }
 
+// svd0 is like [Affine.svd], but only computes the second return value. This is
+// faster if only that value is needed.
+func (aff Affine) svd0() Vec2 {
+	// OPT(dh): if [Affine.svd] were inlined and dead code got eliminated, we
+	// wouldn't need svd0.
+	a := aff.N0
+	a2 := a * a
+	b := aff.N1
+	b2 := b * b
+	c := aff.N2
+	c2 := c * c
+	d := aff.N3
+	d2 := d * d
+	ab := a * b
+	cd := c * d
+	s1 := a2 + b2 + c2 + d2
+	s2 := math.Sqrt(pow2(a2-b2+c2-d2) + 4.0*pow2(ab+cd))
+	return Vec2{
+		X: math.Sqrt(0.5 * (s1 + s2)),
+		Y: math.Sqrt(0.5 * (s1 - s2)),
+	}
+}
+
+// svd1 is like [Affine.svd], but only computes the second return value. This is
+// faster if only that value is needed.
+func (aff Affine) svd1() float64 {
+	// OPT(dh): if [Affine.svd] were inlined and dead code got eliminated, we
+	// wouldn't need svd0.
+	a := aff.N0
+	a2 := a * a
+	b := aff.N1
+	b2 := b * b
+	c := aff.N2
+	c2 := c * c
+	d := aff.N3
+	d2 := d * d
+	ab := a * b
+	cd := c * d
+	th := math.Atan2(0.5*(2.0*(ab+cd)), a2-b2+c2-d2)
+	return th
+}
+
 // Translation returns the translation component of this affine transformation.
 func (aff Affine) Translation() Vec2 {
 	return Vec2{
