@@ -9,6 +9,9 @@ package curve
 import (
 	"math"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 )
 
 func assertNear(t *testing.T, p0 Point, p1 Point, epsilon float64) {
@@ -96,5 +99,101 @@ func TestReflection(t *testing.T) {
 		assertNear(t, Pt(1, 0).Transform(aff), Pt(1, 0), epsilon)
 		assertNear(t, Pt(2, 1).Transform(aff), Pt(2, 1), epsilon)
 		assertNear(t, Pt(2, 2).Transform(aff), Pt(3, 1), epsilon)
+	}
+}
+
+func BenchmarkAffine_svd(b *testing.B) {
+	aff := Identity.ThenScale(3, 7).ThenRotate(1.23)
+	for b.Loop() {
+		aff.svd()
+	}
+}
+
+func BenchmarkAffine_svd0(b *testing.B) {
+	aff := Identity.ThenScale(3, 7).ThenRotate(1.23)
+	for b.Loop() {
+		aff.svd0()
+	}
+}
+
+func BenchmarkAffine_svd1(b *testing.B) {
+	aff := Identity.ThenScale(3, 7).ThenRotate(1.23)
+	for b.Loop() {
+		aff.svd1()
+	}
+}
+
+func TestAffine_svd(t *testing.T) {
+	tests := []struct {
+		aff   Affine
+		want  Vec2
+		want2 float64
+	}{
+		{
+			Affine{1, 0, 0, 1, 0, 0},
+			Vec(1, 1),
+			0,
+		},
+		{
+			Affine{1, 0, 0, -1, 0, 0},
+			Vec(1, 1),
+			0,
+		},
+		{
+			Affine{1, 1, 1, 1, 0, 0},
+			Vec(2, 0),
+			1.5707963267948966,
+		},
+		{
+			Affine{0, 0, 1, 0, 0, 0},
+			Vec(1, 0),
+			0,
+		},
+		{
+			Scale(4, 8).
+				ThenRotateAbout(0.733038, Pt(-2, 50)),
+			Vec(8, 4),
+			-1.777989284994809,
+		},
+
+		// Correctly handles negative scaling (singular values are necessarily non-negative).
+		{
+			Scale(-20, 3),
+			Vec(20, 3),
+			0,
+		},
+		{
+			Scale(-20, -3),
+			Vec(20, 3),
+			0,
+		},
+		{
+			Scale(20, -3),
+			Vec(20, 3),
+			0,
+		},
+	}
+	for _, tt := range tests {
+		t.Run("", func(t *testing.T) {
+			got, got2 := tt.aff.svd()
+			if !cmp.Equal(got, tt.want, cmpopts.EquateApprox(0, 1e-6)) {
+				t.Errorf("svd() = %v, want %v", got, tt.want)
+			}
+			if !cmp.Equal(got2, tt.want2, cmpopts.EquateApprox(0, 1e-6)) {
+				t.Errorf("svd() = %v, want %v", got2, tt.want2)
+			}
+		})
+	}
+
+	// Given a full-rank transform, the product of its singular values
+	// should be equal to its absolute determinant.
+	m := Affine{10, 9, -2.5, 10.0 / 3.0, 0, 0}
+	s, _ := m.svd()
+	prod := s.X * s.Y
+	det := math.Abs(m.Determinant())
+
+	if !cmp.Equal(prod, det, cmpopts.EquateApprox(0, 1e-6)) {
+		t.Errorf("the product of the singular values %v (%v) should be equal to the absolute determinant %v",
+			s, prod, det)
 	}
 }
