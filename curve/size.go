@@ -103,8 +103,7 @@ func (sz Size) Trunc() Size {
 }
 
 func (sz Size) AspectRatio() float64 {
-	// XXX why height / width and not width / height?
-	return sz.Height / sz.Width
+	return sz.Width / sz.Height
 }
 
 // IsInf reports whether at least one of width and height is infinite.

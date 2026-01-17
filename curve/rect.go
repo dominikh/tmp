@@ -274,12 +274,12 @@ func (r Rect) ScaleFromOrigin(f float64) Rect {
 
 // AspectRatio returns the aspect ratio of the rectangle.
 //
-// This is defined as the height divided by the width. It measures the
+// This is defined as the width divided by the height. It measures the
 // "squareness" of the rectangle (a value of 1 is square).
 //
-// If the width is 0 the output will be "sign(y1 - y0) * infinity".
+// If the height is 0 the output will be "sign(x1 - x0) * infinity".
 //
-// If The width and height are 0, the result will be NaN.
+// If the width and height are 0, the result will be NaN.
 func (r Rect) AspectRatio() float64 {
 	return r.Size().AspectRatio()
 }
@@ -365,31 +365,32 @@ func (r Rect) RoundedRect(radii RoundedRectRadii) RoundedRect {
 // ContainedRectWithAspectRatio returns the largest possible rectangle that is
 // fully contained in this rectangle, with the given aspect ratio.
 //
-// The aspect ratio is specified fractionally, as height / width.
+// The aspect ratio is specified fractionally, as width / height.
 //
 // The resulting rectangle will be centered if it is smaller than the input
 // rectangle.
 func (r Rect) ContainedRectWithAspectRatio(aspectRatio float64) Rect {
 	width, height := r.Width(), r.Height()
-	rAspect := height / width
+	rAspect := width / height
 
 	// TODO the parameter 1e-9 was chosen quickly and may not be optimal.
 	if math.Abs(rAspect-aspectRatio) < 1e-9 {
 		return r
 	} else if math.Abs(rAspect) < math.Abs(aspectRatio) {
-		// shrink x to fit
-		newWidth := height / aspectRatio
-		gap := (width - newWidth) * 0.5
-		x0 := r.X0 + gap
-		x1 := r.X1 - gap
-		return Rect{x0, r.Y0, x1, r.Y1}
-	} else {
 		// shrink y to fit
-		newHeight := width * aspectRatio
+		newHeight := width / aspectRatio
 		gap := (height - newHeight) * 0.5
 		y0 := r.Y0 + gap
 		y1 := r.Y1 - gap
 		return Rect{r.X0, y0, r.X1, y1}
+
+	} else {
+		// shrink x to fit
+		newWidth := height * aspectRatio
+		gap := (width - newWidth) * 0.5
+		x0 := r.X0 + gap
+		x1 := r.X1 - gap
+		return Rect{x0, r.Y0, x1, r.Y1}
 	}
 }
 

@@ -54,6 +54,7 @@ func TestRectAreaSign(t *testing.T) {
 
 func TestContainedRectWithAspectRatio(t *testing.T) {
 	f := func(outer Rect, aspectRatio float64, want Rect) {
+		t.Helper()
 		if got := outer.ContainedRectWithAspectRatio(aspectRatio); got != want {
 			t.Errorf("got %v, want %v", got, want)
 		}
@@ -64,19 +65,19 @@ func TestContainedRectWithAspectRatio(t *testing.T) {
 	f(Rect{10.0, 0.0, 0.0, 20.0}, 1.0, Rect{10.0, 15.0, 0.0, 5.0})
 	f(Rect{10.0, 20.0, 0.0, 0.0}, 1.0, Rect{10.0, 15.0, 0.0, 5.0})
 	// non-square
-	f(Rect{0.0, 0.0, 10.0, 20.0}, 0.5, Rect{0.0, 7.5, 10.0, 12.5})
+	f(Rect{0.0, 0.0, 10.0, 20.0}, 1.0/0.5, Rect{0.0, 7.5, 10.0, 12.5})
 	// same aspect ratio
-	f(Rect{0.0, 0.0, 10.0, 20.0}, 2.0, Rect{0.0, 0.0, 10.0, 20.0})
+	f(Rect{0.0, 0.0, 10.0, 20.0}, 1.0/2.0, Rect{0.0, 0.0, 10.0, 20.0})
 	// negative aspect ratio
 	f(Rect{0.0, 0.0, 10.0, 20.0}, -1.0, Rect{0.0, 15.0, 10.0, 5.0})
 	// infinite aspect ratio
-	f(Rect{0.0, 0.0, 10.0, 20.0}, math.Inf(1), Rect{5.0, 0.0, 5.0, 20.0})
+	f(Rect{0.0, 0.0, 10.0, 20.0}, math.Inf(1), Rect{0.0, 10.0, 10.0, 10.0})
 	// zero aspect ratio
-	f(Rect{0.0, 0.0, 10.0, 20.0}, 0.0, Rect{0.0, 10.0, 10.0, 10.0})
+	f(Rect{0.0, 0.0, 10.0, 20.0}, 0, Rect{5.0, 0.0, 5.0, 20.0})
 	// zero width rect
 	f(Rect{0.0, 0.0, 0.0, 20.0}, 1.0, Rect{0.0, 10.0, 0.0, 10.0})
 	// many zeros
-	f(Rect{0.0, 0.0, 0.0, 20.0}, 0.0, Rect{0.0, 10.0, 0.0, 10.0})
+	f(Rect{0.0, 0.0, 0.0, 20.0}, 0.0, Rect{0.0, 0.0, 0.0, 20.0})
 	// everything zero
 	f(Rect{0.0, 0.0, 0.0, 0.0}, 0.0, Rect{0.0, 0.0, 0.0, 0.0})
 }
