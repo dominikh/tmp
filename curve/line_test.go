@@ -58,3 +58,13 @@ func TestIntersectLine(t *testing.T) {
 		t.Errorf("expected no intersections, got %v", xs[:n])
 	}
 }
+
+func BenchmarkLineNearest(b *testing.B) {
+	for b.Loop() {
+		l := Line{Pt(10, 20), Pt(30, 50)}
+		// Points chosen to exercise all paths in Nearest.
+		l.Nearest(Pt(10, 10), 0)
+		l.Nearest(Pt(30, 30), 0)
+		l.Nearest(Pt(40, 50), 0)
+	}
+}

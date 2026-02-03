@@ -979,73 +979,124 @@ func Flatten(seq iter.Seq[PathElement], tolerance float64) iter.Seq[PathElement]
 			case QuadToKind:
 				p1, p2 := el.P0, el.P1
 				if p0, ok := lastPt.Get(); ok {
-					q := QuadBez{p0, p1, p2}
-					params := q.estimateSubdiv(sqrtTol)
-					n := max(int(math.Ceil(0.5*params.val/sqrtTol)), 1)
-					step := 1.0 / float64(n)
-					for i := 1; i < n; i++ {
-						u := float64(i) * step
-						t := q.determineSubdivT(&params, u)
-						p := q.Eval(t)
-						if !yield(LineTo(p)) {
+					// An upper bound on the shortest distance of any point on the quadratic Bezier
+					// curve to the line segment [p0, p2] is 1/2 of the control-point-to-line-segment
+					// distance.
+					//
+					// The derivation is similar to that for the cubic Bezier (see below). In
+					// short:
+					//
+					// q(t) = B0(t) p0 + B1(t) p1 + B2(t) p2
+					// dist(q(t), [p0, p1]) <= B1(t) dist(p1, [p0, p1])
+					//                       = 2 (1-t)t dist(p1, [p0, p1]).
+					//
+					// The maximum occurs at t=1/2, hence
+					// max(dist(q(t), [p0, p1] <= 1/2 dist(p1, [p0, p1])).
+					//
+					// The following takes the square to elide the square root of the Euclidean
+					// distance.
+					line := Line{p0, p2}
+					if distSq, _ := line.Nearest(p1, 0); distSq <= 4*tolerance*tolerance {
+						if !yield(LineTo(p2)) {
 							return
 						}
-					}
-					if !yield(LineTo(p2)) {
-						return
+					} else {
+						q := QuadBez{p0, p1, p2}
+						params := q.estimateSubdiv(sqrtTol)
+						n := max(int(math.Ceil(0.5*params.val/sqrtTol)), 1)
+						step := 1.0 / float64(n)
+						for i := 1; i < n; i++ {
+							u := float64(i) * step
+							t := q.determineSubdivT(&params, u)
+							p := q.Eval(t)
+							if !yield(LineTo(p)) {
+								return
+							}
+						}
+						if !yield(LineTo(p2)) {
+							return
+						}
 					}
 				}
 				lastPt = maybe.Some(p2)
 			case CubicToKind:
 				p1, p2, p3 := el.P0, el.P1, el.P2
 				if p0, ok := lastPt.Get(); ok {
-					c := CubicBez{p0, p1, p2, p3}
-
-					// Subdivide into quadratics, and estimate the number of
-					// subdivisions required for each, summing to arrive at an
-					// estimate for the number of subdivisions for the cubic.
-					// Also retain these parameters for later.
-					quadBuf = quadBuf[:0]
-					sqrtRemainTol := sqrtTol * math.Sqrt(1.0-toQuadTol)
-					sum := 0.0
-					for quad := range c.Quadratics(tolerance * toQuadTol) {
-						q := quad.Segment
-						params := q.estimateSubdiv(sqrtRemainTol)
-						sum += params.val
-						quadBuf = append(quadBuf, struct {
-							q      QuadBez
-							params flattenParams
-						}{q, params})
-					}
-					n := max(int(math.Ceil(0.5*sum/sqrtRemainTol)), 1)
-
-					// Iterate through the quadratics, outputting the points of
-					// subdivisions that fall within that quadratic.
-					step := sum / float64(n)
-					i := 1
-					valSum := 0.0
-					for _, thingy := range quadBuf {
-						q := thingy.q
-						params := thingy.params
-						target := float64(i) * step
-						recipVal := 1.0 / params.val
-						for target < valSum+params.val {
-							u := (target - valSum) * recipVal
-							t := q.determineSubdivT(&params, u)
-							p := q.Eval(t)
-							if !yield(LineTo(p)) {
-								return
-							}
-							i += 1
-							if i == n+1 {
-								break
-							}
-							target = float64(i) * step
+					// An upper bound on the shortest distance of any point on the cubic Bezier
+					// curve to the line segment [p0, p3] is 3/4 of the maximum of the
+					// control-point-to-line-segment distances.
+					//
+					// With Bernstein weights Bi(t), we have
+					// c(t) = B0(t) p0 + B1(t) p1 + B2(t) p2 + B3(t) p3
+					// with t from 0 to 1 (inclusive).
+					//
+					// Through convexivity of the Euclidean distance function and the line segment,
+					// we have
+					// dist(c(t), [p0, p3]) <= B1(t) dist(p1, [p0, p3]) + B2(t) dist(p2, [p0, p3])
+					//                      <= (B1(t) + B2(t)) max(dist(p1, [p0, p3]), dist(p2, [p0, p3]))
+					//                       = 3 ((1-t)t^2 + (1-t)^2t) max(dist(p1, [p0, p3]), dist(p2, [p0, p3])).
+					//
+					// The inner polynomial has its maximum of 1/4 at t=1/2, hence
+					// max(dist(c(t), [p0, p3])) <= 3/4 max(dist(p1, [p0, p3]), dist(p2, [p0, p3])).
+					//
+					// The following takes the square to elide the square root of the Euclidean
+					// distance.
+					line := Line{p0, p3}
+					distSq1, _ := line.Nearest(p1, 0)
+					distSq2, _ := line.Nearest(p2, 0)
+					if max(distSq1, distSq2) <= 16.0/9.0*(tolerance*tolerance) {
+						if !yield(LineTo(p3)) {
+							return
 						}
-						valSum += params.val
-					}
-					if !yield(LineTo(p3)) {
-						return
+					} else {
+						c := CubicBez{p0, p1, p2, p3}
+
+						// Subdivide into quadratics, and estimate the number of
+						// subdivisions required for each, summing to arrive at an
+						// estimate for the number of subdivisions for the cubic.
+						// Also retain these parameters for later.
+						quadBuf = quadBuf[:0]
+						sqrtRemainTol := sqrtTol * math.Sqrt(1.0-toQuadTol)
+						sum := 0.0
+						for quad := range c.Quadratics(tolerance * toQuadTol) {
+							q := quad.Segment
+							params := q.estimateSubdiv(sqrtRemainTol)
+							sum += params.val
+							quadBuf = append(quadBuf, struct {
+								q      QuadBez
+								params flattenParams
+							}{q, params})
+						}
+						n := max(int(math.Ceil(0.5*sum/sqrtRemainTol)), 1)
+
+						// Iterate through the quadratics, outputting the points of
+						// subdivisions that fall within that quadratic.
+						step := sum / float64(n)
+						i := 1
+						valSum := 0.0
+						for _, thingy := range quadBuf {
+							q := thingy.q
+							params := thingy.params
+							target := float64(i) * step
+							recipVal := 1.0 / params.val
+							for target < valSum+params.val {
+								u := (target - valSum) * recipVal
+								t := q.determineSubdivT(&params, u)
+								p := q.Eval(t)
+								if !yield(LineTo(p)) {
+									return
+								}
+								i += 1
+								if i == n+1 {
+									break
+								}
+								target = float64(i) * step
+							}
+							valSum += params.val
+						}
+						if !yield(LineTo(p3)) {
+							return
+						}
 					}
 				}
 				lastPt = maybe.Some(p3)
