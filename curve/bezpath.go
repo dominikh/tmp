@@ -964,6 +964,12 @@ func Flatten(seq iter.Seq[PathElement], tolerance float64) iter.Seq[PathElement]
 			q      QuadBez
 			params flattenParams
 		}{}
+
+		// The sum variable is technically local to some nested scope, but
+		// because of the heavy use of iterators and closures, it escapes.
+		// Declaring it up here means it only produces one allocation per call
+		// to Flatten, instead of one per cubic bezier in the path.
+		var sum float64
 		for el := range seq {
 			switch el.Kind {
 			case MoveToKind:
@@ -1057,7 +1063,7 @@ func Flatten(seq iter.Seq[PathElement], tolerance float64) iter.Seq[PathElement]
 						// Also retain these parameters for later.
 						quadBuf = quadBuf[:0]
 						sqrtRemainTol := sqrtTol * math.Sqrt(1.0-toQuadTol)
-						sum := 0.0
+						sum = 0.0
 						for quad := range c.Quadratics(tolerance * toQuadTol) {
 							q := quad.Segment
 							params := q.estimateSubdiv(sqrtRemainTol)
