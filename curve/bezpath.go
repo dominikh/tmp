@@ -960,10 +960,6 @@ func Flatten(seq iter.Seq[PathElement], tolerance float64) iter.Seq[PathElement]
 
 		sqrtTol := math.Sqrt(tolerance)
 		var lastPt maybe.Option[Point]
-		quadBuf := []struct {
-			q      QuadBez
-			params flattenParams
-		}{}
 
 		// The sum variable is technically local to some nested scope, but
 		// because of the heavy use of iterators and closures, it escapes.
@@ -1060,29 +1056,23 @@ func Flatten(seq iter.Seq[PathElement], tolerance float64) iter.Seq[PathElement]
 						// Subdivide into quadratics, and estimate the number of
 						// subdivisions required for each, summing to arrive at an
 						// estimate for the number of subdivisions for the cubic.
-						// Also retain these parameters for later.
-						quadBuf = quadBuf[:0]
 						sqrtRemainTol := sqrtTol * math.Sqrt(1.0-toQuadTol)
 						sum = 0.0
 						for quad := range c.Quadratics(tolerance * toQuadTol) {
 							q := quad.Segment
 							params := q.estimateSubdiv(sqrtRemainTol)
 							sum += params.val
-							quadBuf = append(quadBuf, struct {
-								q      QuadBez
-								params flattenParams
-							}{q, params})
 						}
-						n := max(int(math.Ceil(0.5*sum/sqrtRemainTol)), 1)
 
 						// Iterate through the quadratics, outputting the points of
 						// subdivisions that fall within that quadratic.
+						n := max(int(math.Ceil(0.5*sum/sqrtRemainTol)), 1)
 						step := sum / float64(n)
 						i := 1
 						valSum := 0.0
-						for _, thingy := range quadBuf {
-							q := thingy.q
-							params := thingy.params
+						for quad := range c.Quadratics(tolerance * toQuadTol) {
+							q := quad.Segment
+							params := q.estimateSubdiv(sqrtRemainTol)
 							target := float64(i) * step
 							recipVal := 1.0 / params.val
 							for target < valSum+params.val {
@@ -1100,6 +1090,7 @@ func Flatten(seq iter.Seq[PathElement], tolerance float64) iter.Seq[PathElement]
 							}
 							valSum += params.val
 						}
+
 						if !yield(LineTo(p3)) {
 							return
 						}
