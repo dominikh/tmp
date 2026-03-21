@@ -183,10 +183,11 @@ func (c CubicBez) Quadratics(accuracy float64) iter.Seq[CubicToQuadraticSegment]
 		err := p2x2.Sub(p1x2).Hypot2()
 		n := max(int(math.Ceil(math.Sqrt(math.Cbrt(err/maxHypot2)))), 1)
 
+		d := c.Differentiate()
 		for i := range n {
 			t0 := float64(i) / float64(n)
 			t1 := float64(i+1) / float64(n)
-			seg := c.Subsegment(t0, t1)
+			seg := c.subsegmentWithDerivative(t0, t1, d)
 			p1x2 := Vec2(seg.P1).Mul(3).Sub(Vec2(seg.P0))
 			p2x2 := Vec2(seg.P2).Mul(3).Sub(Vec2(seg.P3))
 			result := QuadBez{seg.P0, Point(p1x2.Add(p2x2).Mul(1.0 / 4.0)), seg.P3}
@@ -195,6 +196,15 @@ func (c CubicBez) Quadratics(accuracy float64) iter.Seq[CubicToQuadraticSegment]
 			}
 		}
 	}
+}
+
+func (c CubicBez) subsegmentWithDerivative(t0, t1 float64, d QuadBez) CubicBez {
+	p0 := c.Eval(t0)
+	p3 := c.Eval(t1)
+	scale := (t1 - t0) * (1.0 / 3.0)
+	p1 := p0.Translate(Vec2(d.Eval(t0)).Mul(scale))
+	p2 := p3.Translate(Vec2(d.Eval(t1)).Mul(scale).Negate())
+	return CubicBez{p0, p1, p2, p3}
 }
 
 func (c CubicBez) Subsegment(t0, t1 float64) CubicBez {
