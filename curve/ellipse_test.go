@@ -58,3 +58,10 @@ func TestEllipseAreaSign(t *testing.T) {
 		t.Errorf("got winding numbers %d and %d, expected them to be the same", ew, pw)
 	}
 }
+
+func BenchmarkEllipseArea(b *testing.B) {
+	e := NewEllipse(Pt(0, 0), Vec(5, 2), 2)
+	for b.Loop() {
+		e.Area()
+	}
+}

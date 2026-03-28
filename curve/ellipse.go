@@ -103,8 +103,10 @@ func (e Ellipse) IsNaN() bool {
 
 // Area implements ClosedShape.
 func (e Ellipse) Area() float64 {
-	x, y := e.Radii().Splat()
-	return math.Pi * x * y
+	// An ellipse is a unit circle transformed by an affine transformation. The
+	// unsigned area of a transformed region is area × abs(det(affine)). The
+	// area of the unit circle is π.
+	return math.Pi * math.Abs(e.inner.Determinant())
 }
 
 // BoundingBox implements ClosedShape.
