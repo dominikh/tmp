@@ -309,7 +309,7 @@ func (aff Affine) svd() (scale Vec2, th float64) {
 	}, th
 }
 
-// svd0 is like [Affine.svd], but only computes the second return value. This is
+// svd0 is like [Affine.svd], but only computes the first return value. This is
 // faster if only that value is needed.
 func (aff Affine) svd0() Vec2 {
 	// OPT(dh): if [Affine.svd] were inlined and dead code got eliminated, we
