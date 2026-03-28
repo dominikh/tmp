@@ -176,3 +176,8 @@ func (l Line) IntersectLine(o Line) ([3]LineIntersection, int) {
 	}
 	return [3]LineIntersection{}, 0
 }
+
+// Reverse returns a copy of this line with the end points swapped.
+func (l Line) Reverse() Line {
+	return Line{l.P1, l.P0}
+}
