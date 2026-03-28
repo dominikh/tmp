@@ -39,6 +39,8 @@ func (v Vec2) Dot(o Vec2) float64 {
 }
 
 // Cross returns the cross product of v and o.
+//
+// This is signed so that (1, 0) × (0, 1) = 1.
 func (v Vec2) Cross(o Vec2) float64 {
 	return v.X*o.Y - v.Y*o.X
 }
