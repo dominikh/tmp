@@ -154,15 +154,173 @@ func (e Ellipse) PathElements(tolerance float64) iter.Seq[PathElement] {
 	}.PathElements(tolerance)
 }
 
-// Perimeter implements ClosedShape.
+// Perimeter returns the approximated ellipse perimeter.
+//
+// This uses a numerical approximation. The absolute error between the calculated perimeter
+// and the true perimeter is bounded by `accuracy` (modulo floating point rounding errors).
+//
+// For circular ellipses (equal horizontal and vertical radii), the calculated perimeter is
+// exact.
 func (e Ellipse) Perimeter(accuracy float64) float64 {
-	// TODO rather than delegate to the bezier path, it is possible to use various series
-	// expansions to compute the perimeter to any accuracy. I believe Ramanujan authored the
-	// quickest to converge. See
-	// https://www.mathematica-journal.com/2009/11/23/on-the-perimeter-of-an-ellipse/
-	// and https://en.wikipedia.org/wiki/Ellipse#Circumference
-	//
-	return SegmentsPerimeter(Segments(e.PathElements(0.1)), accuracy)
+	radii := e.Radii()
+
+	if radii.IsInf() {
+		return math.Inf(1)
+	}
+
+	// Check for the trivial case where the ellipse has one of its radii
+	// equal to 0, i.e., where it describes a line, as the numerical method
+	// used breaks down with this extreme.
+	if radii.X == 0 || radii.Y == 0 {
+		return 4 * max(radii.X, radii.Y)
+	}
+
+	// Evaluate an approximation based on a truncated infinite series. If it
+	// returns a good enough value, we do not need to iterate.
+	if kummerEllipticPerimeterRange(radii) <= accuracy {
+		return kummerEllipticPerimeter(radii)
+	}
+
+	return agmEllipticPerimeter(accuracy, radii)
+}
+
+// kummerEllipticPerimeter calculates circumference C of an ellipse with radii
+// (x, y) as the infinite series
+//
+// C = π (x+y) · ∑ binom(1/2, n)^2 * h^n from n = 0 to ∞
+//
+// with h = (x - y)^2 / (x + y)^2
+// and binom(.,.) the binomial coefficient
+//
+// as described by Kummer ("Über die Hypergeometrische Reihe", 1837) and
+// rediscovered by Linderholm and Segal
+// ("An Overlooked Series for the Elliptic Perimeter", 1995).
+//
+// The series converges very quickly for ellipses with only moderate
+// eccentricity (h not close to 1).
+//
+// The series is truncated to the sixth power, meaning a lower bound on the true
+// value is returned. Adding the value of [kummerEllipticPerimeterRange] to the
+// value returned by this function calculates an upper bound on the true value.
+func kummerEllipticPerimeter(radii Vec2) float64 {
+	x, y := radii.Splat()
+	h := pow2((x - y) / (x + y))
+	h2 := h * h
+	h3 := h2 * h
+	h4 := h3 * h
+	h5 := h4 * h
+	h6 := h5 * h
+
+	lower := math.Pi +
+		h*(math.Pi/4) +
+		h2*(math.Pi/64) +
+		h3*(math.Pi/256) +
+		h4*(math.Pi*25/16384) +
+		h5*(math.Pi*49/65536) +
+		h6*(math.Pi*441/1048576)
+
+	return (x + y) * lower
+}
+
+// kummerEllipticPerimeterRange this calculates the error range of
+// [kummerEllipticPerimeter]. That function returns a lower bound on the true
+// value, and though we do not know what the remainder of the infinite series
+// sums to, we can calculate an upper bound:
+//
+// ∑ binom(1/2, n)^2 for n = 0 to inf
+//
+//	= 1 + (1 / 2‼)² + (1‼ / 4‼)² + (3‼ / 6‼)² + (5‼ / 8‼)² + …
+//	= 4 / π
+//	with ‼ the [double factorial]
+//
+// (equation 274 in "Summation of Series", L. B. W. Jolley, 1961).
+//
+// This means the remainder of the infinite series for C, assuming the series was truncated to the
+// mᵗʰ term and h = 1, sums to
+// 4 / π - ∑ binom(1/2, n)² for n = 0 to m-1
+//
+// As 0 ≤ h ≤ 1, this is an upper bound.
+//
+// [double factorial]: https://en.wikipedia.org/wiki/Double_factorial
+func kummerEllipticPerimeterRange(radii Vec2) float64 {
+	x, y := radii.Splat()
+	h := pow2((x - y) / (x + y))
+
+	const binomSquaredRemainder = 4.0/math.Pi -
+		(1.0 +
+			1.0/4.0 +
+			1.0/64.0 +
+			1.0/256.0 +
+			25.0/16384.0 +
+			49.0/65536.0 +
+			441.0/1048576.0)
+
+	return math.Pi * binomSquaredRemainder * pow7(h) * (x + y)
+}
+
+// agmEllipticPerimeter calculates circumference C of an ellipse with radii
+// (x, y) using the arithmetic-geometric mean, as described in equation 19.8.6 of
+// https://web.archive.org/web/20240926233336/https://dlmf.nist.gov/19.8#i.
+func agmEllipticPerimeter(accuracy float64, radii Vec2) float64 {
+	var x, y float64
+	if radii.X >= radii.Y {
+		x, y = radii.Splat()
+	} else {
+		y, x = radii.Splat()
+	}
+
+	accuracy = accuracy / (2 * math.Pi * radii.X)
+
+	sum := 1.0
+	a := 1.0
+	g := y / x
+	c := math.Sqrt(1 - pow2(g))
+	mul := 0.5
+
+	for {
+		c2 := pow2(c)
+		// term = 2^(n-1) c_n^2
+		term := mul * c2
+		sum -= term
+
+		// We have c_(n+1) ≤ 1/2 c_n
+		// (for a derivation, see e.g. section 2.1 of  "Elliptic integrals, the
+		// arithmetic-geometric mean and the Brent-Salamin algorithm for π" by G.J.O. Jameson:
+		// https://web.archive.org/web/20241002140956/https://www.maths.lancs.ac.uk/jameson/ellagm.pdf)
+		//
+		// Therefore
+		// ∑ 2^(i-1) c_i^2 from i = 1 ≤ ∑ 2^(i-1) ((1/2)^i c_0)^2 from i = 1
+		//                            = ∑ 2^-(i+1) c_0^2          from i = 1
+		//                            = 1/2 c_0^2
+		//
+		// or, for arbitrary starting point i = n+1:
+		// ∑ 2^(i-1) c_i^2 from i = n+1 ≤ ∑ 2^(i-1) ((1/2)^(i-n) c_n)^2 from i = n+1
+		//                              = ∑ 2^(2n - i - 1) c_n^2        from i = n+1
+		//                              = 2^(2n) ∑ 2^(-(i+1)) c_n^2     from i = n+1
+		//                              = 2^(2n) 2^(-(n+1)) c_n^2
+		//                              = 2^(n-1) c_n^2
+		//
+		// Therefore, the remainder of the series sums to less than or equal to 2^(n-1) c_n^2,
+		// which is exactly the value of the nth term.
+		//
+		// Furthermore, a_m ≥ g_n, and g_n ≤ 1, for all m, n.
+		if term <= accuracy*g {
+			// sum currently overestimates the true value - subtract the upper
+			// bound of the remaining series. We will then underestimate the
+			// true value, but by no more than 'accuracy'.
+			sum -= term
+			break
+		}
+
+		mul *= 2
+		// This is equal to c_next = c^2 / (4 * a_next)
+		c = (a - g) / 2
+		aNext := (a + g) / 2
+		g = math.Sqrt(a * g)
+		a = aNext
+	}
+
+	return 2 * math.Pi * radii.X / a * sum
 }
 
 // Winding implements ClosedShape.

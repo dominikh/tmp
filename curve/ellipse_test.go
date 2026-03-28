@@ -7,6 +7,7 @@
 package curve
 
 import (
+	"fmt"
 	"math"
 	"slices"
 	"testing"
@@ -63,5 +64,16 @@ func BenchmarkEllipseArea(b *testing.B) {
 	e := NewEllipse(Pt(0, 0), Vec(5, 2), 2)
 	for b.Loop() {
 		e.Area()
+	}
+}
+
+func BenchmarkEllipsePerimeter(b *testing.B) {
+	e := NewEllipse(Pt(0, 0), Vec(5, 2), 2)
+	for _, accuracy := range []float64{1e-5, 1e-8, 1e-20} {
+		b.Run(fmt.Sprintf("accuracy=%e", accuracy), func(b *testing.B) {
+			for b.Loop() {
+				e.Perimeter(accuracy)
+			}
+		})
 	}
 }
