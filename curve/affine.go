@@ -48,6 +48,13 @@ func Scale(x, y float64) Affine {
 	return Affine{x, 0, 0, y, 0, 0}
 }
 
+// ScaleAbout creates an affine transform representing non-uniform scaling about
+// a point.
+func ScaleAbout(x, y float64, pt Point) Affine {
+	v := Vec2(pt)
+	return Translate(v.Negate()).ThenScale(x, y).ThenTranslate(v)
+}
+
 // Translate creates an affine transform representing translation.
 func Translate(v Vec2) Affine {
 	return Affine{1, 0, 0, 1, v.X, v.Y}
@@ -174,6 +181,20 @@ func (aff Affine) PreScale(x, y float64) Affine {
 // Equivalent to "Scale(x, y) * aff"
 func (aff Affine) ThenScale(x, y float64) Affine {
 	return Scale(x, y).Mul(aff)
+}
+
+// PreScaleAbout creates a scale by (x, y) about pt followed by aff.
+//
+// Equivalent to "aff * ScaleAbout(x, y, pt)"
+func (aff Affine) PreScaleAbout(x, y float64, pt Point) Affine {
+	return aff.Mul(ScaleAbout(x, y, pt))
+}
+
+// ThenScaleAbout creates aff followed by a scale of (x, y) about pt.
+//
+// Equivalent to "ScaleAbout(x, y, pt) * aff"
+func (aff Affine) ThenScaleAbout(x, y float64, pt Point) Affine {
+	return ScaleAbout(x, y, pt).Mul(aff)
 }
 
 // PreTranslate creates a translation of v followed by aff.
