@@ -181,3 +181,10 @@ func (l Line) IntersectLine(o Line) ([3]LineIntersection, int) {
 func (l Line) Reverse() Line {
 	return Line{l.P1, l.P0}
 }
+
+// Midpoint returns the midpoint of the line.
+//
+// See also: [Point.Midpoint]
+func (l Line) Midpoint() Point {
+	return l.P0.Midpoint(l.P1)
+}
