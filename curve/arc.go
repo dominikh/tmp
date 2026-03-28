@@ -110,3 +110,16 @@ func (a Arc) Translate(v Vec2) Arc {
 	a.Center = a.Center.Translate(v)
 	return a
 }
+
+// Reverse returns a copy of this arc in the opposite direction.
+//
+// The new arc will sweep towards the original arc's start angle.
+func (a Arc) Reverse() Arc {
+	return Arc{
+		Center:     a.Center,
+		Radii:      a.Radii,
+		StartAngle: a.StartAngle + a.SweepAngle,
+		SweepAngle: -a.SweepAngle,
+		XRotation:  a.XRotation,
+	}
+}
