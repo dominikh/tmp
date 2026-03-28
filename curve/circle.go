@@ -155,6 +155,33 @@ func (cs CircleSegment) Path(tolerance float64) BezPath {
 	return slices.Collect(cs.PathElements(tolerance))
 }
 
+// OuterArc returns the arc representing the outer radius.
+func (cs CircleSegment) OuterArc() Arc {
+	return Arc{
+		Center:     cs.Center,
+		Radii:      Vec2{cs.OuterRadius, cs.OuterRadius},
+		StartAngle: cs.StartAngle,
+		SweepAngle: cs.SweepAngle,
+		XRotation:  0.0,
+	}
+}
+
+// InnerArc returns the arc representing the inner radius.
+//
+// This is in the opposite direction of the outer arc, so that it is in the same
+// direction as the arc that would be drawn (as the path elements for this
+// circle segment produce a closed path). See [Arc.Reverse] for reversing the
+// arc.
+func (cs CircleSegment) InnerArc() Arc {
+	return Arc{
+		Center:     cs.Center,
+		Radii:      Vec2{cs.InnerRadius, cs.InnerRadius},
+		StartAngle: cs.StartAngle + cs.SweepAngle,
+		SweepAngle: -cs.SweepAngle,
+		XRotation:  0.0,
+	}
+}
+
 // PathElements implements Shape.
 func (cs CircleSegment) PathElements(tolerance float64) iter.Seq[PathElement] {
 	return func(yield func(PathElement) bool) {
@@ -168,13 +195,7 @@ func (cs CircleSegment) PathElements(tolerance float64) iter.Seq[PathElement] {
 		}
 
 		// Outer arc
-		a := Arc{
-			Center:     cs.Center,
-			Radii:      Vec2{cs.OuterRadius, cs.OuterRadius},
-			StartAngle: cs.StartAngle,
-			SweepAngle: cs.SweepAngle,
-			XRotation:  0.0,
-		}
+		a := cs.OuterArc()
 		for el := range dropFirst(a.PathElements(tolerance)) {
 			if !yield(el) {
 				return
@@ -187,13 +208,7 @@ func (cs CircleSegment) PathElements(tolerance float64) iter.Seq[PathElement] {
 		}
 
 		// Inner arc
-		a = Arc{
-			Center:     cs.Center,
-			Radii:      Vec2{cs.InnerRadius, cs.InnerRadius},
-			StartAngle: cs.StartAngle + cs.SweepAngle,
-			SweepAngle: -cs.SweepAngle,
-			XRotation:  0.0,
-		}
+		a = cs.InnerArc()
 		for el := range dropFirst(a.PathElements(tolerance)) {
 			if !yield(el) {
 				return
