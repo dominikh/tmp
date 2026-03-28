@@ -47,6 +47,22 @@ func (sz Size) Area() float64 {
 	return sz.Width * sz.Height
 }
 
+// Min returns the component-wise minimum of two sizes.
+func (sz Size) Min(o Size) Size {
+	return Size{
+		Width:  min(sz.Width, o.Width),
+		Height: min(sz.Height, o.Height),
+	}
+}
+
+// Max returns the component-wise maximum of two sizes.
+func (sz Size) Max(o Size) Size {
+	return Size{
+		Width:  max(sz.Width, o.Width),
+		Height: max(sz.Height, o.Height),
+	}
+}
+
 func (sz Size) Clamp(minSz, maxSz Size) Size {
 	w := min(max(sz.Width, minSz.Width), maxSz.Width)
 	h := min(max(sz.Height, minSz.Height), maxSz.Height)
