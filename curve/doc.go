@@ -43,7 +43,9 @@
 // This package includes the following shapes:
 //   - [Arc]
 //   - [Circle]
-//   - [CircleSegment]
+//   - [CircleSector]
+//   - [Annulus]
+//   - [AnnulusSector]
 //   - [CubicBez]
 //   - [Ellipse]
 //   - [Line]

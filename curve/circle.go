@@ -75,14 +75,12 @@ func (c Circle) PathElements(tolerance float64) iter.Seq[PathElement] {
 	}
 }
 
-// Segment returns a circle segment by cutting out parts of this circle.
-func (c Circle) Segment(innerRadius float64, startAngle, sweepAngle float64) CircleSegment {
-	return CircleSegment{
-		Center:      c.Center,
-		OuterRadius: c.Radius,
-		InnerRadius: innerRadius,
-		StartAngle:  startAngle,
-		SweepAngle:  sweepAngle,
+func (c Circle) Sector(startAngle, sweepAngle float64) CircleSector {
+	return CircleSector{
+		Center:     c.Center,
+		Radius:     c.Radius,
+		StartAngle: startAngle,
+		SweepAngle: sweepAngle,
 	}
 }
 
@@ -133,86 +131,51 @@ func (c Circle) Transform(aff Affine) Ellipse {
 	return NewEllipseFromCircle(c).Transform(aff)
 }
 
-// CircleSegment represents a segment of a circle.
-//
-// If InnerRadius > 0, then the shape will be a doughnut segment.
-type CircleSegment struct {
-	Center      Point
-	OuterRadius float64
-	InnerRadius float64
-	StartAngle  float64
-	SweepAngle  float64
+type CircleSector struct {
+	Center     Point
+	Radius     float64
+	StartAngle float64
+	SweepAngle float64
 }
 
-var _ ClosedShape = CircleSegment{}
+var _ ClosedShape = CircleSector{}
 
 // Contains implements ClosedShape.
-func (cs CircleSegment) Contains(pt Point) bool {
+func (cs CircleSector) Contains(pt Point) bool {
 	return cs.Winding(pt) != 0
 }
 
-func (cs CircleSegment) Path(tolerance float64) BezPath {
+func (cs CircleSector) Path(tolerance float64) BezPath {
 	return slices.Collect(cs.PathElements(tolerance))
 }
 
-// OuterArc returns the arc representing the outer radius.
-func (cs CircleSegment) OuterArc() Arc {
+func (cs CircleSector) Arc() Arc {
 	return Arc{
 		Center:     cs.Center,
-		Radii:      Vec2{cs.OuterRadius, cs.OuterRadius},
+		Radii:      Vec2{cs.Radius, cs.Radius},
 		StartAngle: cs.StartAngle,
 		SweepAngle: cs.SweepAngle,
 		XRotation:  0.0,
 	}
 }
 
-// InnerArc returns the arc representing the inner radius.
-//
-// This is in the opposite direction of the outer arc, so that it is in the same
-// direction as the arc that would be drawn (as the path elements for this
-// circle segment produce a closed path). See [Arc.Reverse] for reversing the
-// arc.
-func (cs CircleSegment) InnerArc() Arc {
-	return Arc{
-		Center:     cs.Center,
-		Radii:      Vec2{cs.InnerRadius, cs.InnerRadius},
-		StartAngle: cs.StartAngle + cs.SweepAngle,
-		SweepAngle: -cs.SweepAngle,
-		XRotation:  0.0,
-	}
-}
-
 // PathElements implements Shape.
-func (cs CircleSegment) PathElements(tolerance float64) iter.Seq[PathElement] {
+func (cs CircleSector) PathElements(tolerance float64) iter.Seq[PathElement] {
 	return func(yield func(PathElement) bool) {
-		if !yield(MoveTo(pointOnCircle(cs.Center, cs.InnerRadius, cs.StartAngle))) {
+		if !yield(MoveTo(cs.Center)) {
 			return
 		}
-
-		// First radius
-		if !yield(LineTo(pointOnCircle(cs.Center, cs.OuterRadius, cs.StartAngle))) {
+		if !yield(LineTo(pointOnCircle(cs.Center, cs.Radius, cs.StartAngle))) {
 			return
 		}
-
-		// Outer arc
-		a := cs.OuterArc()
+		a := cs.Arc()
 		for el := range dropFirst(a.PathElements(tolerance)) {
 			if !yield(el) {
 				return
 			}
 		}
-
-		// Second radius
-		if !yield(LineTo(pointOnCircle(cs.Center, cs.InnerRadius, cs.StartAngle+cs.SweepAngle))) {
+		if !yield(LineTo(cs.Center)) {
 			return
-		}
-
-		// Inner arc
-		a = cs.InnerArc()
-		for el := range dropFirst(a.PathElements(tolerance)) {
-			if !yield(el) {
-				return
-			}
 		}
 	}
 }
@@ -226,34 +189,32 @@ func pointOnCircle(center Point, radius float64, angle float64) Point {
 		})
 }
 
-func (cs CircleSegment) IsInf() bool {
+func (cs CircleSector) IsInf() bool {
 	return cs.Center.IsInf() ||
-		math.IsInf(cs.OuterRadius, 0) ||
-		math.IsInf(cs.InnerRadius, 0) ||
+		math.IsInf(cs.Radius, 0) ||
 		math.IsInf(cs.StartAngle, 0) ||
 		math.IsInf(cs.SweepAngle, 0)
 }
 
-func (cs CircleSegment) IsNaN() bool {
+func (cs CircleSector) IsNaN() bool {
 	return cs.Center.IsNaN() ||
-		math.IsNaN(cs.OuterRadius) ||
-		math.IsNaN(cs.InnerRadius) ||
+		math.IsNaN(cs.Radius) ||
 		math.IsNaN(cs.StartAngle) ||
 		math.IsNaN(cs.SweepAngle)
 }
 
-func (cs CircleSegment) Translate(v Vec2) CircleSegment {
+func (cs CircleSector) Translate(v Vec2) CircleSector {
 	cs.Center = cs.Center.Translate(v)
 	return cs
 }
 
-func (cs CircleSegment) Area() float64 {
-	return 0.5 * math.Abs(cs.OuterRadius*cs.OuterRadius-cs.InnerRadius*cs.InnerRadius) * cs.SweepAngle
+func (cs CircleSector) Area() float64 {
+	return 0.5 * cs.Radius * cs.Radius * cs.SweepAngle
 }
 
-func (cs CircleSegment) BoundingBox() Rect {
+func (cs CircleSector) BoundingBox() Rect {
 	// todo this is currently not tight
-	r := max(cs.InnerRadius, cs.OuterRadius)
+	r := cs.Radius
 	x := cs.Center.X
 	y := cs.Center.Y
 	return Rect{
@@ -264,21 +225,17 @@ func (cs CircleSegment) BoundingBox() Rect {
 	}
 }
 
-func (cs CircleSegment) Perimeter(accuracy float64) float64 {
-	return 2.0*
-		math.Abs(cs.OuterRadius-cs.InnerRadius) +
-		cs.SweepAngle*(cs.InnerRadius+cs.OuterRadius)
+func (cs CircleSector) Perimeter(accuracy float64) float64 {
+	return 2.0*cs.Radius + cs.SweepAngle*cs.Radius
 }
 
-func (cs CircleSegment) Winding(pt Point) int {
+func (cs CircleSector) Winding(pt Point) int {
 	angle := pt.Sub(cs.Center).Angle()
 	if angle < cs.StartAngle || angle > cs.StartAngle+cs.SweepAngle {
 		return 0
 	}
 	dist2 := pt.Sub(cs.Center).Hypot2()
-	if dist2 < cs.OuterRadius*cs.OuterRadius && dist2 > cs.InnerRadius*cs.InnerRadius ||
-
-		dist2 < cs.InnerRadius*cs.InnerRadius && dist2 > cs.OuterRadius*cs.OuterRadius {
+	if dist2 < cs.Radius*cs.Radius && dist2 >= 0 {
 		return 1
 	} else {
 		return 0
