@@ -53,7 +53,23 @@ func (r Rect) WithSize(size Size) Rect {
 	return NewRectFromOrigin(r.Origin(), size)
 }
 
-// TODO(dh): Inset
+// Inset applies insets to r.
+//
+// The operation is performed on r.Abs(), so it does not preserve negative width
+// or height in the input rectangle.
+func (r Rect) Inset(insets Insets) Rect {
+	return insets.Apply(r)
+}
+
+// Sub computes the insets that transform o into r.
+func (r Rect) Sub(o Rect) Insets {
+	return Insets{
+		X0: o.X0 - r.X0,
+		Y0: o.Y0 - r.Y0,
+		X1: r.X1 - o.X1,
+		Y1: r.Y1 - o.Y1,
+	}
+}
 
 // Abs returns a new rectangle with the same extents as r, but ensuring that width and
 // height are non-negative.
