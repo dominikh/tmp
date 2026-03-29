@@ -55,11 +55,6 @@ func (c CubicBez) Perimeter(accuracy float64) float64 {
 	return c.Arclen(accuracy)
 }
 
-// Winding implements [Shape].
-func (c CubicBez) Winding(pt Point) int {
-	return 0
-}
-
 // Arclen returns the arclength of a cubic Bézier segment.
 //
 // This is an adaptive subdivision approach using Legendre-Gauss quadrature
