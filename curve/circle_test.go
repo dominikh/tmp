@@ -28,7 +28,7 @@ func TestCircleAreaSign(t *testing.T) {
 	}
 
 	p := BezPath(slices.Collect(c.PathElements(1e-9)))
-	if ca, pa := c.Area(), p.SignedArea(); !approxEqual(ca, pa) {
+	if ca, pa := c.Area(), p.Area(); !approxEqual(ca, pa) {
 		t.Errorf("got areas %v and %v, expected them to be equal", ca, pa)
 	}
 	if cw, pw := c.Winding(center), p.Winding(center); cw != pw {
@@ -45,7 +45,7 @@ func TestCircleAreaSign(t *testing.T) {
 	}
 
 	pNegRadius := BezPath(slices.Collect(cNegRadius.PathElements(1e-9)))
-	if ca, pa := cNegRadius.Area(), pNegRadius.SignedArea(); !approxEqual(ca, pa) {
+	if ca, pa := cNegRadius.Area(), pNegRadius.Area(); !approxEqual(ca, pa) {
 		t.Errorf("got areas %v and %v, expected them to be equal", ca, pa)
 	}
 	if cw, pw := cNegRadius.Winding(center), pNegRadius.Winding(center); cw != pw {

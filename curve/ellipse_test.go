@@ -33,7 +33,7 @@ func TestEllipseAreaSign(t *testing.T) {
 	}
 
 	p := BezPath(slices.Collect(e.PathElements(1e-9)))
-	if ea, pa := e.Area(), p.SignedArea(); !approxEqual(ea, pa) {
+	if ea, pa := e.Area(), p.Area(); !approxEqual(ea, pa) {
 		t.Errorf("got areas %v and %v, expected them to be the same", ea, pa)
 	}
 
@@ -51,7 +51,7 @@ func TestEllipseAreaSign(t *testing.T) {
 	}
 
 	pNegRadius := BezPath(slices.Collect(eNegRadius.PathElements(1e-9)))
-	if ea, pa := eNegRadius.Area(), pNegRadius.SignedArea(); !approxEqual(ea, pa) {
+	if ea, pa := eNegRadius.Area(), pNegRadius.Area(); !approxEqual(ea, pa) {
 		t.Errorf("got areas %v and %v, expected them to be the same", ea, pa)
 	}
 

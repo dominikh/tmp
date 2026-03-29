@@ -38,7 +38,7 @@ func TestTriangleAreaSign(t *testing.T) {
 	}
 
 	p := BezPath(slices.Collect(tri.PathElements(1e-9)))
-	if ta, pa := tri.Area(), p.SignedArea(); !approxEqual(ta, pa) {
+	if ta, pa := tri.Area(), p.Area(); !approxEqual(ta, pa) {
 		t.Errorf("expected triangle and path areas to be approximately equal, got %v and %v", ta, pa)
 	}
 	if tw, pw := tri.Winding(center), p.Winding(center); tw != pw {
@@ -54,7 +54,7 @@ func TestTriangleAreaSign(t *testing.T) {
 	}
 
 	pFlip := BezPath(slices.Collect(triFlip.PathElements(1e-9)))
-	if ta, pa := triFlip.Area(), pFlip.SignedArea(); !approxEqual(ta, pa) {
+	if ta, pa := triFlip.Area(), pFlip.Area(); !approxEqual(ta, pa) {
 		t.Errorf("expected flipped triangle and path areas to be approximately equal, got %v and %v", ta, pa)
 	}
 	if tw, pw := triFlip.Winding(center), pFlip.Winding(center); tw != pw {

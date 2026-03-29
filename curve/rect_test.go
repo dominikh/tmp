@@ -27,7 +27,7 @@ func TestRectAreaSign(t *testing.T) {
 	}
 
 	var p BezPath = slices.Collect(r.PathElements(1e-9))
-	if ra, pa := r.Area(), p.SignedArea(); !approxEqual(ra, pa) {
+	if ra, pa := r.Area(), p.Area(); !approxEqual(ra, pa) {
 		t.Errorf("expected r's and p's areas to be approximately equal, got %v and %v", ra, pa)
 	}
 	if rw, pw := r.Winding(center), p.Winding(center); rw != pw {
@@ -44,7 +44,7 @@ func TestRectAreaSign(t *testing.T) {
 	}
 
 	var pFlip BezPath = slices.Collect(rFlip.PathElements(1e09))
-	if ra, pa := rFlip.Area(), pFlip.SignedArea(); !approxEqual(ra, pa) {
+	if ra, pa := rFlip.Area(), pFlip.Area(); !approxEqual(ra, pa) {
 		t.Errorf("expected r's and p's areas to be approximately equal, got %v and %v", ra, pa)
 	}
 	if rw, pw := rFlip.Winding(center), pFlip.Winding(center); rw != pw {
@@ -148,7 +148,7 @@ func TestRoundedRectBeziers(t *testing.T) {
 	p := BezPath(slices.Collect(rect.PathElements(1e-9)))
 	// Note: could be more systematic about tolerance tightness.
 	const epsilon = 1e-7
-	if ra, pa := rect.Area(), p.SignedArea(); math.Abs(ra-pa) > epsilon {
+	if ra, pa := rect.Area(), p.Area(); math.Abs(ra-pa) > epsilon {
 		t.Errorf("got areas %v and %v, expected them to be the same", ra, pa)
 	}
 	if w := p.Winding(Point{}); w != 1 {

@@ -137,7 +137,7 @@ func (l Line) Extrema() ([MaxExtrema]float64, int) {
 	return [MaxExtrema]float64{}, 0
 }
 
-func (l Line) SignedArea() float64 {
+func (l Line) Area() float64 {
 	return Vec2(l.P0).Cross(Vec2(l.P1)) * 0.5
 }
 

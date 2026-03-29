@@ -62,8 +62,7 @@
 // quadratic and cubic Béziers, for example.
 //
 // [Arclener] is an optional interface implemented by curves that can compute
-// their length. [SignedAreaer] is an optional interface implemented by curves
-// that can compute their [signed area]. [ArclenSolver] is an optional interface
+// their length. [ArclenSolver] is an optional interface
 // implemented by curves that can efficiently solve for t given an arc length.
 //
 // [FittableCurve] is closely related to [ParametricCurve] and describes
@@ -143,6 +142,22 @@
 // Many functions, such as [Dash] or [Simplify] can be considered adapters that
 // map from one sequence to another.
 //
+// # Oriented area / signed area
+//
+// The Area method on shapes returns their oriented area. The oriented area of a
+// closed shape is its enclosed area, with the sign depending on the order of
+// traversal. In a y-down coordinate system, the area is positive for clockwise
+// traversal, while in a y-up one, it is positive for anticlockwise traversal.
+//
+// When open shapes, such as [CubicBez], implement this method, they compute
+// their contribution to the overall area of a closed shape, such as a
+// closed [BezPath] made up of multiple curves.
+//
+// The oriented area is also commonly called the signed area, but we wanted
+// to avoid confusion with the definition from calculus, where the signed
+// area of a curve is the area between the curve and the x-axis. This is not
+// the case here.
+//
 // # Literature
 //
 // This package makes use of the following ideas:
@@ -169,8 +184,7 @@
 // [How to solve a cubic equation, revisited]: https://momentsingraphics.de/CubicRoots.html
 // [Parallel curves of cubic Béziers]: https://raphlinus.github.io/curves/2022/09/09/parallel-beziers.html
 // [Simplifying Bézier paths]: https://raphlinus.github.io/curves/2023/04/18/bezpath-simplify.html
+// [Calculating Area of Closed Curves in ℝ²]: http://ich.deanmcnamee.com/graphics/2016/03/30/CurveArea.html
 // [kurbo]: https://github.com/linebender/kurbo
 // [winding number]: https://en.wikipedia.org/wiki/Winding_number
-// [Calculating Area of Closed Curves in ℝ²]: http://ich.deanmcnamee.com/graphics/2016/03/30/CurveArea.html
-// [signed area]: https://alexkritchevsky.com/2018/08/06/oriented-area.html
 package curve

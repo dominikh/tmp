@@ -155,7 +155,7 @@ func FitToCubic(
 	dx, dy := d.X, d.Y
 	// Subtract off area of chord
 	area -= dx * (y0 + 0.5*dy)
-	// area is signed area of closed curve segment.
+	// area is oriented area of closed curve segment.
 	// This quantity is invariant to translation and rotation.
 
 	// Subtract off moment of chord

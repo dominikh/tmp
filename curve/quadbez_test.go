@@ -103,23 +103,23 @@ func TestQuadBezRaise(t *testing.T) {
 	}
 }
 
-func TestQuadbezSignedArea(t *testing.T) {
+func TestQuadbezArea(t *testing.T) {
 	approxEqual := func(x, y float64) bool {
 		return math.Abs(x-y) < 1e-12
 	}
 
 	// y = 1 - x^2
 	q := QuadBez{Pt(1.0, 0.0), Pt(0.5, 1.0), Pt(0.0, 1.0)}
-	if v := q.SignedArea(); !approxEqual(v, 2.0/3.0) {
+	if v := q.Area(); !approxEqual(v, 2.0/3.0) {
 		t.Errorf("got %v, want %v", v, 2.0/3.0)
 	}
-	if v := q.Transform(Rotate(0.5)).SignedArea(); !approxEqual(v, 2.0/3.0) {
+	if v := q.Transform(Rotate(0.5)).Area(); !approxEqual(v, 2.0/3.0) {
 		t.Errorf("got %v, want %v", v, 2.0/3.0)
 	}
-	if v := q.Transform(Translate(Vec(0.0, 1.0))).SignedArea(); !approxEqual(v, 3.5/3.0) {
+	if v := q.Transform(Translate(Vec(0.0, 1.0))).Area(); !approxEqual(v, 3.5/3.0) {
 		t.Errorf("got %v, want %v", v, 3.5/3.0)
 	}
-	if v := q.Transform(Translate(Vec(1.0, 0.0))).SignedArea(); !approxEqual(v, 3.5/3.0) {
+	if v := q.Transform(Translate(Vec(1.0, 0.0))).Area(); !approxEqual(v, 3.5/3.0) {
 		t.Errorf("got %v, want %v", v, 3.5/3.0)
 	}
 }

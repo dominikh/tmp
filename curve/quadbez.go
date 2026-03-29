@@ -235,7 +235,7 @@ func (q QuadBez) Transform(aff Affine) QuadBez {
 	}
 }
 
-func (q QuadBez) SignedArea() float64 {
+func (q QuadBez) Area() float64 {
 	v := q.P0.X*(2.0*q.P1.Y+q.P2.Y) +
 		2.0*(q.P1.X*(q.P2.Y-q.P0.Y)) -
 		q.P2.X*(q.P0.Y+2.0*q.P1.Y)

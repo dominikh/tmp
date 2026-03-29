@@ -291,14 +291,14 @@ func (seg PathSegment) SolveForArclen(arclen, accuracy float64) float64 {
 	}
 }
 
-func (seg PathSegment) SignedArea() float64 {
+func (seg PathSegment) Area() float64 {
 	switch seg.Kind {
 	case LineKind:
-		return seg.Line().SignedArea()
+		return seg.Line().Area()
 	case QuadKind:
-		return seg.Quad().SignedArea()
+		return seg.Quad().Area()
 	case CubicKind:
-		return seg.Cubic().SignedArea()
+		return seg.Cubic().Area()
 	default:
 		return 0
 	}
@@ -688,8 +688,8 @@ func (p BezPath) Flatten(tolerance float64) iter.Seq[PathElement] {
 	return Flatten(p.PathElements(0), tolerance)
 }
 
-func (p BezPath) SignedArea() float64 {
-	return SegmentsSignedArea(p.Segments())
+func (p BezPath) Area() float64 {
+	return SegmentsArea(p.Segments())
 }
 
 func (p BezPath) Perimeter(accuracy float64) float64 {
@@ -1115,10 +1115,10 @@ func SegmentsPerimeter(seq iter.Seq[PathSegment], accuracy float64) float64 {
 	return sum
 }
 
-func SegmentsSignedArea(seq iter.Seq[PathSegment]) float64 {
+func SegmentsArea(seq iter.Seq[PathSegment]) float64 {
 	var sum float64
 	for s := range seq {
-		sum += s.SignedArea()
+		sum += s.Area()
 	}
 	return sum
 }

@@ -443,7 +443,7 @@ func TestCubicBezInvArclenAccuracy(t *testing.T) {
 	}
 }
 
-func TestCubicBezSignedAreaLinear(t *testing.T) {
+func TestCubicBezAreaLinear(t *testing.T) {
 	// y = 1 - x
 	c := CubicBez{
 		Pt(1.0, 0.0),
@@ -453,13 +453,13 @@ func TestCubicBezSignedAreaLinear(t *testing.T) {
 	}
 	const epsilon = 1e-12
 
-	diff(t, 0.5, c.SignedArea())
-	diff(t, 0.5, c.Transform(Rotate(0.5)).SignedArea(), cmpopts.EquateApprox(0, epsilon))
-	diff(t, 1.0, c.Transform(Translate(Vec(0.0, 1.0))).SignedArea(), cmpopts.EquateApprox(0, epsilon))
-	diff(t, 1.0, c.Transform(Translate(Vec(1.0, 0.0))).SignedArea(), cmpopts.EquateApprox(0, epsilon))
+	diff(t, 0.5, c.Area())
+	diff(t, 0.5, c.Transform(Rotate(0.5)).Area(), cmpopts.EquateApprox(0, epsilon))
+	diff(t, 1.0, c.Transform(Translate(Vec(0.0, 1.0))).Area(), cmpopts.EquateApprox(0, epsilon))
+	diff(t, 1.0, c.Transform(Translate(Vec(1.0, 0.0))).Area(), cmpopts.EquateApprox(0, epsilon))
 }
 
-func TestCubicBezSignedArea(t *testing.T) {
+func TestCubicBezArea(t *testing.T) {
 	// y = 1 - x^3
 	c := CubicBez{
 		Pt(1.0, 0.0),
@@ -468,8 +468,8 @@ func TestCubicBezSignedArea(t *testing.T) {
 		Pt(0.0, 1.0),
 	}
 	const epsilon = 1e-12
-	diff(t, 0.75, c.SignedArea(), cmpopts.EquateApprox(0, epsilon))
-	diff(t, 0.75, c.Transform(Rotate(0.5)).SignedArea(), cmpopts.EquateApprox(0, epsilon))
-	diff(t, 1.25, c.Transform(Translate(Vec(0.0, 1.0))).SignedArea(), cmpopts.EquateApprox(0, epsilon))
-	diff(t, 1.25, c.Transform(Translate(Vec(1.0, 0.0))).SignedArea(), cmpopts.EquateApprox(0, epsilon))
+	diff(t, 0.75, c.Area(), cmpopts.EquateApprox(0, epsilon))
+	diff(t, 0.75, c.Transform(Rotate(0.5)).Area(), cmpopts.EquateApprox(0, epsilon))
+	diff(t, 1.25, c.Transform(Translate(Vec(0.0, 1.0))).Area(), cmpopts.EquateApprox(0, epsilon))
+	diff(t, 1.25, c.Transform(Translate(Vec(1.0, 0.0))).Area(), cmpopts.EquateApprox(0, epsilon))
 }

@@ -30,6 +30,9 @@ const DefaultAccuracy = 1e-6
 
 // Angle is an angle in radians.
 //
+// In a y-down coordinate system, positive values rotate clockwise. In a y-up
+// one, they rotate anticlockwise.
+//
 // See [DegToRad] and [RadToDeg] for converting between degrees and radians.
 type Angle = float64
 
@@ -91,12 +94,14 @@ func BoundingBox(c interface {
 
 type ClosedShape interface {
 	Shape
-	// Area returns the signed area of the closed shape.
+	// Area returns the oriented area of the closed shape.
 	//
-	// The convention for positive area is that y increases when x is positive.
-	// Thus, it is clockwise when down is increasing y (the usual convention for
-	// graphics), and anticlockwise when up is increasing y (the usual
-	// convention for math).
+	// Some open shapes also implement this method. In that case, it returns
+	// their contribution to an overall closed shape that they are presumed to
+	// be part of.
+	//
+	// See the package-level documentation for a more thorough explanation of
+	// the oriented area.
 	Area() float64
 
 	// Winding returns the [winding number] of a point.
@@ -161,21 +166,6 @@ type Arclener interface {
 	// for ridiculously low values). Compute time may vary with accuracy, if the
 	// curve needs to be subdivided.
 	Arclen(accuracy float64) float64
-}
-
-// SignedAreaer describes a parametrized curve that can have the signed area
-// under it measured.
-//
-// For a closed path, the signed area of the path is the sum of signed areas of
-// the segments. This is a variant of the "shoelace formula."
-//
-// This can be computed exactly for Béziers thanks to Green's theorem, and also
-// for simple curves such as circular arcs. For more exotic curves, it's
-// probably best to subdivide to cubics. We leave that to the caller, which is
-// why we don't give an accuracy parameter here.
-type SignedAreaer interface {
-	SignedArea() float64
-	// XXX find a name that isn't stupid
 }
 
 // expand rounds f away from zero.

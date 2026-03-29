@@ -393,7 +393,7 @@ func (c CubicBez) Nearest(pt Point, accuracy float64) (distSq, t float64) {
 	return rBest, tBest
 }
 
-func (c CubicBez) SignedArea() float64 {
+func (c CubicBez) Area() float64 {
 	v := c.P0.X*(6.0*c.P1.Y+3.0*c.P2.Y+c.P3.Y) +
 		3.0*(c.P1.X*(-2.0*c.P0.Y+c.P2.Y+c.P3.Y)-c.P2.X*(c.P0.Y+c.P1.Y-2.0*c.P3.Y)) -
 		c.P3.X*(c.P0.Y+3.0*c.P1.Y+6.0*c.P2.Y)
