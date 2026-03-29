@@ -20,12 +20,7 @@ type Arc struct {
 	XRotation  float64
 }
 
-var _ ClosedShape = Arc{}
-
-// Contains implements ClosedShape.
-func (a Arc) Contains(pt Point) bool {
-	return a.Winding(pt) != 0
-}
+var _ Shape = Arc{}
 
 func (a Arc) Path(tolerance float64) BezPath { return slices.Collect(a.PathElements(tolerance)) }
 
@@ -84,25 +79,11 @@ func rotatePt(pt Vec2, angle float64) Vec2 {
 	}
 }
 
-func (a Arc) Area() float64 {
-	return math.Pi * a.Radii.X * a.Radii.Y
-}
-
 func (a Arc) BoundingBox() Rect {
 	panic("not implemented")
 }
 
-// Perimeter returns the perimeter of the ellipse.
-//
-// Note: Finding the perimeter of an ellipse is [fairly involved],
-// so for now we just approximate by using the bezier curve representation.
-//
-// [fairly involved]: https://en.wikipedia.org/wiki/Ellipse#Circumference
 func (a Arc) Perimeter(accuracy float64) float64 {
-	panic("not implemented")
-}
-
-func (a Arc) Winding(pt Point) int {
 	panic("not implemented")
 }
 
