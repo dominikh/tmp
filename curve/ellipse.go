@@ -27,7 +27,7 @@ var _ ClosedShape = Ellipse{}
 //
 // Rotation is clockwise in a y-down coordinate system. For more on
 // rotation, see [Rotate].
-func NewEllipse(center Point, radii Vec2, xRotation float64) Ellipse {
+func NewEllipse(center Point, radii Vec2, xRotation Angle) Ellipse {
 	rx, ry := radii.Splat()
 	return newEllipse(Vec2(center), rx, ry, xRotation)
 }
@@ -72,13 +72,13 @@ func (e Ellipse) WithRadii(radii Vec2) Ellipse {
 //
 // The rotation is clockwise, for a y-down coordinate system. For more
 // on rotation, See [Rotate].
-func (e Ellipse) WithRotation(rotation float64) Ellipse {
+func (e Ellipse) WithRotation(rotation Angle) Ellipse {
 	scale := e.inner.svd0()
 	translation := e.inner.Translation()
 	return newEllipse(translation, scale.X, scale.Y, rotation)
 }
 
-func newEllipse(center Vec2, scaleX, scaleY, xRotation float64) Ellipse {
+func newEllipse(center Vec2, scaleX, scaleY float64, xRotation Angle) Ellipse {
 	// Since the circle is symmetric about the x and y axes, using absolute values for the
 	// radii results in the same ellipse. For simplicity we make this change here.
 	return Ellipse{
@@ -350,7 +350,7 @@ func (e Ellipse) Radii() Vec2 {
 }
 
 // Rotation returns the ellipse's rotation, in radians.
-func (e Ellipse) Rotation() float64 {
+func (e Ellipse) Rotation() Angle {
 	rot := e.inner.svd1()
 	return rot
 }
@@ -359,7 +359,7 @@ func (e Ellipse) Rotation() float64 {
 //
 // This is equivalent to, but more efficiant than, using [Ellipse.Radii] and
 // [Ellipse.Rotation].
-func (e Ellipse) RadiiRotation() (Vec2, float64) {
+func (e Ellipse) RadiiRotation() (Vec2, Angle) {
 	return e.inner.svd()
 }
 

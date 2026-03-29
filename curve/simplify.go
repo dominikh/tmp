@@ -136,7 +136,7 @@ func (simp simplifyBezPath) momentIntegrals(i int, start, end float64) (float64,
 var _ FittableCurve = simplifyBezPath{}
 
 type SimplifyOptions struct {
-	AngleThresh float64
+	AngleThresh Angle
 	OptLevel    OptLevel
 }
 

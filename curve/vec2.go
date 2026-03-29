@@ -59,7 +59,7 @@ func (v Vec2) Hypot2() float64 {
 
 // Angle returns the angle in radians between the vector and ⟨1, 0⟩ in the positive y
 // direction. This is atan2(y, x).
-func (v Vec2) Angle() float64 {
+func (v Vec2) Angle() Angle {
 	return math.Atan2(v.Y, v.X)
 }
 
@@ -70,7 +70,7 @@ func (v Vec2) Angle() float64 {
 // Thus, in a y-down coordinate system (as is common for graphics),
 // it is a clockwise rotation, and in y-up (traditional for math), it
 // is anti-clockwise.
-func VecFromAngle(th float64) Vec2 {
+func VecFromAngle(th Angle) Vec2 {
 	y, x := math.Sincos(th)
 	return Vec2{
 		X: x,

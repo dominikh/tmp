@@ -75,7 +75,7 @@ func (c Circle) PathElements(tolerance float64) iter.Seq[PathElement] {
 	}
 }
 
-func (c Circle) Sector(startAngle, sweepAngle float64) CircleSector {
+func (c Circle) Sector(startAngle, sweepAngle Angle) CircleSector {
 	return CircleSector{
 		Center:     c.Center,
 		Radius:     c.Radius,
@@ -134,8 +134,8 @@ func (c Circle) Transform(aff Affine) Ellipse {
 type CircleSector struct {
 	Center     Point
 	Radius     float64
-	StartAngle float64
-	SweepAngle float64
+	StartAngle Angle
+	SweepAngle Angle
 }
 
 var _ ClosedShape = CircleSector{}

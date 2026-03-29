@@ -101,7 +101,7 @@ func (an Annulus) Winding(pt Point) int {
 	}
 }
 
-func (an Annulus) Sector(startAngle, sweepAngle float64) AnnulusSector {
+func (an Annulus) Sector(startAngle, sweepAngle Angle) AnnulusSector {
 	return AnnulusSector{
 		Center:      an.Center,
 		OuterRadius: an.OuterRadius,
@@ -115,8 +115,8 @@ type AnnulusSector struct {
 	Center      Point
 	OuterRadius float64
 	InnerRadius float64
-	StartAngle  float64
-	SweepAngle  float64
+	StartAngle  Angle
+	SweepAngle  Angle
 }
 
 var _ ClosedShape = AnnulusSector{}

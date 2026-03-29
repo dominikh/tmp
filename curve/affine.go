@@ -66,9 +66,7 @@ func Translate(v Vec2) Affine {
 // positive X direction into positive Y. Thus, in a Y-down coordinate
 // system (as is common for graphics), it is a clockwise rotation, and
 // in Y-up (traditional for math), it is anti-clockwise.
-//
-// The angle th is expressed in radians.
-func Rotate(th float64) Affine {
+func Rotate(th Angle) Affine {
 	sin, cos := math.Sincos(th)
 	return Affine{cos, sin, -sin, cos, 0, 0}
 }
@@ -77,7 +75,7 @@ func Rotate(th float64) Affine {
 // about center.
 //
 // See [Rotate] for more info.
-func RotateAbout(th float64, center Point) Affine {
+func RotateAbout(th Angle, center Point) Affine {
 	c := Vec2(center)
 	return Translate(c.Negate()).ThenRotate(th).ThenTranslate(c)
 }
@@ -144,28 +142,28 @@ func (aff Affine) Mul(o Affine) Affine {
 // PreRotate creates a rotation by th followed by aff.
 //
 // Equivalent to "aff * Rotate(th)"
-func (aff Affine) PreRotate(th float64) Affine {
+func (aff Affine) PreRotate(th Angle) Affine {
 	return aff.Mul(Rotate(th))
 }
 
 // ThenRotate creates aff followed by a rotation of th.
 //
 // Equivalent to "Rotate(th) * aff"
-func (aff Affine) ThenRotate(th float64) Affine {
+func (aff Affine) ThenRotate(th Angle) Affine {
 	return Rotate(th).Mul(aff)
 }
 
 // PreRotateAbout creates a rotation by th about center followed by aff.
 //
 // Equivalent to "aff * RotateAbout(th)"
-func (aff Affine) PreRotateAbout(th float64, center Point) Affine {
+func (aff Affine) PreRotateAbout(th Angle, center Point) Affine {
 	return RotateAbout(th, center).Mul(aff)
 }
 
 // "ThenRotateAbout creates aff followed by a rotation of th about center.
 //
 // Equivalent to "RotateAbout(th, center) * aff"
-func (aff Affine) ThenRotateAbout(th float64, center Point) Affine {
+func (aff Affine) ThenRotateAbout(th Angle, center Point) Affine {
 	return RotateAbout(th, center).Mul(aff)
 }
 
@@ -287,7 +285,7 @@ func (aff Affine) IsNaN() bool {
 //
 // First part of the return tuple is the scaling, second part is the angle of rotation (in
 // radians)
-func (aff Affine) svd() (scale Vec2, th float64) {
+func (aff Affine) svd() (scale Vec2, th Angle) {
 	// OPT(dh): if svd ever begins to inline, we should switch the computation
 	// of the scale over to the algorithm used in svd0.
 	a := aff.N0

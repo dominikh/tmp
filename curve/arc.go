@@ -15,9 +15,9 @@ import (
 type Arc struct {
 	Center     Point
 	Radii      Vec2
-	StartAngle float64
-	SweepAngle float64
-	XRotation  float64
+	StartAngle Angle
+	SweepAngle Angle
+	XRotation  Angle
 }
 
 var _ Shape = Arc{}
@@ -63,7 +63,7 @@ func (a Arc) PathElements(tolerance float64) iter.Seq[PathElement] {
 
 // Take the ellipse radii, how the radii are rotated, and the sweep angle, and return a
 // point on the ellipse.
-func sampleEllipse(radii Vec2, xRotation float64, angle float64) Vec2 {
+func sampleEllipse(radii Vec2, xRotation, angle Angle) Vec2 {
 	sin, cos := math.Sincos(angle)
 	u := radii.X * cos
 	v := radii.Y * sin
@@ -71,7 +71,7 @@ func sampleEllipse(radii Vec2, xRotation float64, angle float64) Vec2 {
 }
 
 // Rotate pt about the origin by angle radians.
-func rotatePt(pt Vec2, angle float64) Vec2 {
+func rotatePt(pt Vec2, angle Angle) Vec2 {
 	sin, cos := math.Sincos(angle)
 	return Vec2{
 		X: pt.X*cos - pt.Y*sin,

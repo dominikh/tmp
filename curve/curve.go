@@ -28,6 +28,23 @@ const MaxExtrema = 4
 // argument. It is suitable for general-purpose use, such as 2D graphics.
 const DefaultAccuracy = 1e-6
 
+// Angle is an angle in radians.
+//
+// See [DegToRad] and [RadToDeg] for converting between degrees and radians.
+type Angle = float64
+
+// DegToRad converts degrees to radians. See [RadToDeg] for the opposite
+// direction.
+func DegToRad(deg float64) Angle {
+	return deg * math.Pi / 180
+}
+
+// RadToDeg converts radians to degrees. See [DegToRad] for the opposite
+// direction.
+func RadToDeg(rad Angle) float64 {
+	return rad * 180 / math.Pi
+}
+
 // Extremer describes parametrized curves that report their extrema.
 type Extremer interface {
 	// Extrema computes the extrema of the curve.
