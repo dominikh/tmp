@@ -63,7 +63,7 @@
 //
 // [Arclener] is an optional interface implemented by curves that can compute
 // their length. [SignedAreaer] is an optional interface implemented by curves
-// that can compute their signed area. [ArclenSolver] is an optional interface
+// that can compute their [signed area]. [ArclenSolver] is an optional interface
 // implemented by curves that can efficiently solve for t given an arc length.
 //
 // [FittableCurve] is closely related to [ParametricCurve] and describes
@@ -172,4 +172,5 @@
 // [kurbo]: https://github.com/linebender/kurbo
 // [winding number]: https://en.wikipedia.org/wiki/Winding_number
 // [Calculating Area of Closed Curves in ℝ²]: http://ich.deanmcnamee.com/graphics/2016/03/30/CurveArea.html
+// [signed area]: https://alexkritchevsky.com/2018/08/06/oriented-area.html
 package curve
