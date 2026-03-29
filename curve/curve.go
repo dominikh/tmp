@@ -97,7 +97,8 @@ type ClosedShape interface {
 }
 
 type Shape interface {
-	// Perimeter returns the length of a shape's perimeter.
+	// Perimeter returns the length of a shape's perimeter. For open shapes,
+	// such as arcs, the perimeter is really the arc length.
 	Perimeter(accuracy float64) float64
 
 	// BoundingBox returns the smallest rectangle that encloses the shape.
