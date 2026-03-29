@@ -92,7 +92,7 @@ func minDistParam(
 			if dij < dkj {
 				atBoundary0OnBez2 = false
 			}
-			dkj = dRk(i, 2*n, bez1, bez2)
+			dkj = dRk(i, 2*m, bez1, bez2)
 			if dij < dkj {
 				atBoundary1OnBez2 = false
 			}

@@ -7,6 +7,7 @@
 package curve
 
 import (
+	"math"
 	"testing"
 
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -77,4 +78,34 @@ func TestMinDistOutOfOrder(t *testing.T) {
 	mindist1 := bez1.MinDist(bez2, 0.5)
 	mindist2 := bez2.MinDist(bez1, 0.5)
 	diff(t, mindist1.Distance, mindist2.Distance, cmpopts.EquateApprox(0, 0.5))
+}
+
+func TestMinDistLineCurve(t *testing.T) {
+	line := PathSegment{
+		Kind: LineKind,
+		P0:   Pt(929, 335),
+		P1:   Pt(911, 340),
+	}
+
+	lineAsBez := PathSegment{
+		Kind: CubicKind,
+		P0:   line.Eval(0),
+		P1:   line.Eval(1.0 / 3.0),
+		P2:   line.Eval(2.0 / 3.0),
+		P3:   line.Eval(1),
+	}
+
+	bez2 := PathSegment{
+		Kind: CubicKind,
+		P0:   Pt(1052.0, 401.0),
+		P1:   Pt(1048.0, 305.0),
+		P2:   Pt(1046.0, 216.0),
+		P3:   Pt(1054.0, 146.0),
+	}
+
+	mindistAsBez := lineAsBez.MinDist(bez2, 0.5)
+	mindistAsLine := line.MinDist(bez2, 0.5)
+	if math.Abs(mindistAsBez.Distance-mindistAsLine.Distance) > 0.5 {
+		t.Fatalf("%g != %g", mindistAsBez.Distance, mindistAsLine.Distance)
+	}
 }
