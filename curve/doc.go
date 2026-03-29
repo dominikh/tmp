@@ -52,6 +52,7 @@
 //   - [QuadBez]
 //   - [Rect]
 //   - [RoundedRect]
+//   - [Triangle]
 //
 // [ParametricCurve] describes parametrized curves. These curves can be
 // evaluated at t ∈ [0, 1] and return pairs of (x, y) values, commonly
