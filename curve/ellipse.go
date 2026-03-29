@@ -109,7 +109,7 @@ func (e Ellipse) Area() float64 {
 	return math.Pi * math.Abs(e.inner.Determinant())
 }
 
-// BoundingBox implements ClosedShape.
+// BoundingBox implements Shape.
 func (e Ellipse) BoundingBox() Rect {
 	// Compute a tight bounding box of the ellipse.
 	//
@@ -142,7 +142,7 @@ func (e Ellipse) BoundingBox() Rect {
 
 func (e Ellipse) Path(tolerance float64) BezPath { return slices.Collect(e.PathElements(tolerance)) }
 
-// PathElements implements ClosedShape.
+// PathElements implements Shape.
 func (e Ellipse) PathElements(tolerance float64) iter.Seq[PathElement] {
 	radii, xRotation := e.inner.svd()
 	return Arc{
