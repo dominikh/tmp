@@ -10,6 +10,8 @@ import (
 	"iter"
 	"math"
 	"slices"
+
+	"honnef.co/go/stuff/math/polyroot"
 )
 
 func makeWeights(rev bool) [nLSE]float64 {
@@ -569,7 +571,6 @@ func (co *cubicOffset) findSubdivisionPoint(rec *offsetRec) subdivisionPoint {
 // still a robustness concern for vanishing derivative at the endpoints.
 func (co *cubicOffset) subdivideForTangent(utan0 Vec2, t0, t1 float64, tan Vec2, force bool) (subdivisionPoint, bool) {
 	t := 0.0
-	nSoln := 0
 	// set up quadratic equation for matching tangents
 	z0 := tan.Cross(Vec2(co.q.P0))
 	z1 := tan.Cross(Vec2(co.q.P1))
@@ -577,13 +578,11 @@ func (co *cubicOffset) subdivideForTangent(utan0 Vec2, t0, t1 float64, tan Vec2,
 	c0 := z0
 	c1 := 2.0 * (z1 - z0)
 	c2 := (z2 - z1) - (z1 - z0)
-	roots, numRoots := SolveQuadratic(c0, c1, c2)
-	for _, root := range roots[:numRoots] {
-		if root >= t0 && root <= t1 {
-			t = root
-			nSoln++
-		}
+	roots := polyroot.NewPolynomial(c0, c1, c2).Roots(t0, t1, 0, nil)
+	if len(roots) > 0 {
+		t = roots[len(roots)-1]
 	}
+	nSoln := len(roots)
 	if nSoln != 1 {
 		if !force {
 			return subdivisionPoint{}, false

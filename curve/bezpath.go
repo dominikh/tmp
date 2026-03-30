@@ -14,6 +14,7 @@ import (
 	"slices"
 
 	"honnef.co/go/stuff/container/maybe"
+	"honnef.co/go/stuff/math/polyroot"
 )
 
 type PathElementKind int
@@ -410,15 +411,13 @@ func (seg PathSegment) windingInner(pt Point) int {
 		a := end.Y - 2.0*p1.Y + start.Y
 		b := 2.0 * (p1.Y - start.Y)
 		c := start.Y - pt.Y
-		solution, n := SolveQuadratic(c, b, a)
-		for _, t := range solution[:n] {
-			if t >= 0.0 && t <= 1.0 {
-				x := quad.Eval(t).X
-				if pt.X >= x {
-					return sign
-				} else {
-					return 0
-				}
+		solution := polyroot.NewPolynomial(c, b, a).Roots(0, 1, 0, nil)
+		for _, t := range solution {
+			x := quad.Eval(t).X
+			if pt.X >= x {
+				return sign
+			} else {
+				return 0
 			}
 		}
 		return 0
@@ -436,15 +435,13 @@ func (seg PathSegment) windingInner(pt Point) int {
 		b := 3.0 * (p2.Y - 2.0*p1.Y + start.Y)
 		c := 3.0 * (p1.Y - start.Y)
 		d := start.Y - pt.Y
-		solution, n := SolveCubic(d, c, b, a)
-		for _, t := range solution[:n] {
-			if t >= 0.0 && t <= 1.0 {
-				x := cubic.Eval(t).X
-				if pt.X >= x {
-					return sign
-				} else {
-					return 0
-				}
+		solution := polyroot.NewPolynomial(d, c, b, a).Roots(0, 1, 0, nil)
+		for _, t := range solution {
+			x := cubic.Eval(t).X
+			if pt.X >= x {
+				return sign
+			} else {
+				return 0
 			}
 		}
 		return 0

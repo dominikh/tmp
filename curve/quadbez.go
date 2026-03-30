@@ -12,6 +12,7 @@ import (
 	"slices"
 
 	"honnef.co/go/stuff/container/maybe"
+	"honnef.co/go/stuff/math/polyroot"
 )
 
 var _ Shape = QuadBez{}
@@ -195,9 +196,6 @@ func (q QuadBez) Nearest(pt Point, accuracy float64) (distSq, outT float64) {
 		rBest *maybe.Option[float64],
 		t float64,
 	) bool {
-		if !(t >= 0.0 && t <= 1.0) {
-			return true
-		}
 		evalT(pt, tBest, rBest, t, q.Eval(t))
 		return false
 	}
@@ -208,12 +206,12 @@ func (q QuadBez) Nearest(pt Point, accuracy float64) (distSq, outT float64) {
 	c1 := 2.0*d0.Hypot2() + d.Dot(d1)
 	c2 := 3.0 * d1.Dot(d0)
 	c3 := d1.Hypot2()
-	roots, n := SolveCubic(c0, c1, c2, c3)
+	roots := polyroot.NewPolynomial(c0, c1, c2, c3).Roots(0, 1, 0, nil)
 	var rBest maybe.Option[float64]
 	tBest := 0.0
-	needEnds := n == 0
+	needEnds := len(roots) == 0
 
-	for _, t := range roots[:n] {
+	for _, t := range roots {
 		b := tryT(&q, pt, &tBest, &rBest, t)
 		if b {
 			needEnds = true
@@ -349,18 +347,16 @@ func (q QuadBez) IntersectLine(line Line) ([3]LineIntersection, int) {
 	c1 := dy*px1 - dx*py1
 	c2 := dy*px2 - dx*py2
 	invlen2 := 1.0 / (dx*dx + dy*dy)
-	ts, n := SolveQuadratic(c0, c1, c2)
+	ts := polyroot.NewPolynomial(c0, c1, c2).Roots(-epsilon, 1+epsilon, 0, nil)
 	var ret [3]LineIntersection
 	var retN int
-	for _, t := range ts[:n] {
-		if t >= -epsilon && t <= 1+epsilon {
-			x := px0 + t*px1 + t*t*px2
-			y := py0 + t*py1 + t*t*py2
-			u := ((x-p0.X)*dx + (y-p0.Y)*dy) * invlen2
-			if u >= 0.0 && u <= 1.0 {
-				ret[retN] = LineIntersection{u, t}
-				retN++
-			}
+	for _, t := range ts {
+		x := px0 + t*px1 + t*t*px2
+		y := py0 + t*py1 + t*t*py2
+		u := ((x-p0.X)*dx + (y-p0.Y)*dy) * invlen2
+		if u >= 0.0 && u <= 1.0 {
+			ret[retN] = LineIntersection{u, t}
+			retN++
 		}
 	}
 	return ret, retN

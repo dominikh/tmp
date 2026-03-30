@@ -12,6 +12,7 @@ import (
 	"math"
 
 	"honnef.co/go/stuff/container/maybe"
+	"honnef.co/go/stuff/math/polyroot"
 )
 
 // As described in [Simplifying Bézier paths], strictly optimizing for
@@ -252,21 +253,21 @@ func cubicFit(th0 float64, th1 float64, area float64, mx float64) ([4]struct {
 		if quads, ok := FactorQuarticInner(a, b, c, d, false); ok {
 			for _, quad := range quads {
 				qc1, qc0 := quad[0], quad[1]
-				qroots, n := SolveQuadratic(qc0, qc1, 1.0)
-				if n == 0 {
+				qroots := polyroot.NewPolynomial(qc0, qc1, 1).Roots(math.Inf(-1), math.Inf(1), 0, nil)
+				if len(qroots) == 0 {
 					// Real part of pair of complex roots
 					roots = append(roots, -0.5*qc1)
 				} else {
-					roots = append(roots, qroots[:n]...)
+					roots = append(roots, qroots...)
 				}
 			}
 		}
 	} else if math.Abs(a3) > epsilon {
-		qroots, n := SolveCubic(a0, a1, a2, a3)
-		roots = append(roots, qroots[:n]...)
+		qroots := polyroot.NewPolynomial(a0, a1, a2, a3).Roots(math.Inf(-1), math.Inf(1), 0, nil)
+		roots = append(roots, qroots...)
 	} else if math.Abs(a2) > epsilon || math.Abs(a1) > epsilon || math.Abs(a0) > epsilon {
-		qroots, n := SolveQuadratic(a0, a1, a2)
-		roots = append(roots, qroots[:n]...)
+		qroots := polyroot.NewPolynomial(a0, a1, a2).Roots(math.Inf(-1), math.Inf(1), 0, nil)
+		roots = append(roots, qroots...)
 	} else {
 		return [4]struct {
 			cbez CubicBez
@@ -345,10 +346,10 @@ func (cfs CurveFitSample) Intersect(c CubicBez) ([3]float64, int) {
 	c2 := p2.Dot(cfs.Tangent)
 	c3 := p3.Dot(cfs.Tangent)
 
-	roots, n := SolveCubic(c0, c1, c2, c3)
+	roots := polyroot.NewPolynomial(c0, c1, c2, c3).Roots(0, 1, 0, nil)
 	var out [3]float64
 	nn := 0
-	for _, t := range roots[:n] {
+	for _, t := range roots {
 		if t >= 0.0 && t <= 1.0 {
 			out[nn] = t
 			nn++

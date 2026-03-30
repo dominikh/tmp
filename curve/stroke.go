@@ -11,6 +11,8 @@ import (
 	"math"
 	"slices"
 	"sync"
+
+	"honnef.co/go/stuff/math/polyroot"
 )
 
 // Join defines the connection between two segments of a stroke.
@@ -415,19 +417,17 @@ func (ctx *strokeCtx) doLinear(
 	c0 := p[1] - p[0]
 	c1 := 2.0*p[2] - 4.0*p[1] + 2.0*p[0]
 	c2 := p[3] - 3.0*p[2] + 3.0*p[1] - p[0]
-	roots, n := SolveQuadratic(c0, c1, c2)
-	// discard cusps right at endpoints
 	const epsilon = 1e-6
-	for _, t := range roots[:n] {
-		if t > epsilon && t < 1.0-epsilon {
-			mt := 1.0 - t
-			z := mt*(mt*mt*p[0]+3.0*t*(mt*p[1]+t*p[2])) + t*t*t*p[3]
-			p := refPt.Translate(refVec.Mul(z))
-			tan := p.Sub(ctx.lastPt)
-			ctx.doJoin(style, tan)
-			ctx.doLine(style, tan, p)
-			ctx.lastTan = tan
-		}
+	roots := polyroot.NewPolynomial(c0, c1, c2).Roots(epsilon, 1.0-epsilon, 0, nil)
+	// discard cusps right at endpoints
+	for _, t := range roots {
+		mt := 1.0 - t
+		z := mt*(mt*mt*p[0]+3.0*t*(mt*p[1]+t*p[2])) + t*t*t*p[3]
+		p := refPt.Translate(refVec.Mul(z))
+		tan := p.Sub(ctx.lastPt)
+		ctx.doJoin(style, tan)
+		ctx.doLine(style, tan, p)
+		ctx.lastTan = tan
 	}
 	tan := c.P3.Sub(ctx.lastPt)
 	ctx.doJoin(style, tan)

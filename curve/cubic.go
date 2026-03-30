@@ -244,8 +244,8 @@ func (c CubicBez) Extrema() ([MaxExtrema]float64, int) {
 		a := d0 - 2*d1 + d2
 		b := 2 * (d1 - d0)
 		c := d0
-		roots, n := SolveQuadratic(c, b, a)
-		for _, t := range roots[:n] {
+		roots := polyroot.NewPolynomial(c, b, a).Roots(0, 1, 0, nil)
+		for _, t := range roots {
 			if t > 0.0 && t < 1.0 {
 				out[outN] = t
 				outN++
@@ -450,18 +450,16 @@ func (c CubicBez) IntersectLine(line Line) ([3]LineIntersection, int) {
 	c2 := dy*px2 - dx*py2
 	c3 := dy*px3 - dx*py3
 	invlen2 := 1.0 / (dx*dx + dy*dy)
-	ts, n := SolveCubic(c0, c1, c2, c3)
+	ts := polyroot.NewPolynomial(c0, c1, c2, c3).Roots(-epsilon, 1+epsilon, 0, nil)
 	var ret [3]LineIntersection
 	var retN int
-	for _, t := range ts[:n] {
-		if t >= -epsilon && t <= 1+epsilon {
-			x := px0 + t*px1 + t*t*px2 + t*t*t*px3
-			y := py0 + t*py1 + t*t*py2 + t*t*t*py3
-			u := ((x-p0.X)*dx + (y-p0.Y)*dy) * invlen2
-			if u >= 0.0 && u <= 1.0 {
-				ret[retN] = LineIntersection{u, t}
-				retN++
-			}
+	for _, t := range ts {
+		x := px0 + t*px1 + t*t*px2 + t*t*t*px3
+		y := py0 + t*py1 + t*t*py2 + t*t*t*py3
+		u := ((x-p0.X)*dx + (y-p0.Y)*dy) * invlen2
+		if u >= 0.0 && u <= 1.0 {
+			ret[retN] = LineIntersection{u, t}
+			retN++
 		}
 	}
 	return ret, retN
@@ -485,14 +483,12 @@ func (cb CubicBez) Inflections() ([2]float64, int) {
 	a := cb.P1.Sub(cb.P0)
 	b := cb.P2.Sub(cb.P1).Sub(a)
 	c := cb.P3.Sub(cb.P0).Sub(cb.P2.Sub(cb.P1).Mul(3))
-	nums, n := SolveQuadratic(a.Cross(b), a.Cross(c), b.Cross(c))
+	nums := polyroot.NewPolynomial(a.Cross(b), a.Cross(c), b.Cross(c)).Roots(0, 1, 0, nil)
 	var out [2]float64
 	var outN int
-	for _, num := range nums[:n] {
-		if num >= 0 && num <= 1 {
-			out[outN] = num
-			outN++
-		}
+	for _, num := range nums {
+		out[outN] = num
+		outN++
 	}
 	return out, outN
 }
