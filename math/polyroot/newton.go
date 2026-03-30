@@ -164,20 +164,21 @@ func findRoot(
 			return xr
 		}
 
-		// Shrink the range from one end. If the new end is the same as the old
-		// end, then we've run out of precision and are done.
-		//
-		// TODO(dh): make sure that only happens when xb0 and xb1 are adjacent.
+		// Shrink the range from one end.
 		if math.Signbit(y0) != math.Signbit(yr) {
-			if xb1 == xr {
-				return xr
-			}
 			xb1 = xr
 		} else {
-			if xb0 == xr {
-				return xr
-			}
 			xb0 = xr
+		}
+
+		if math.Nextafter(xb0, xb1) == xb1 {
+			// We're out of float64 precision. Find which of xb0 and xb1 is
+			// closer to being the root and return it.
+			if math.Abs(poly.Evaluate(xb0)) <= poly.Evaluate(xb1) {
+				return xb0
+			} else {
+				return xb1
+			}
 		}
 
 		if j%16 == 0 {

@@ -107,7 +107,9 @@ func TestRoots(t *testing.T) {
 		roots []float64
 		// Maximum relative error we tolerate for this polynomial.
 		maxRelativeError float64
-		skip             bool
+		// Forced range for the ranged test
+		range_ [2]float64
+		skip   bool
 	}
 	tests := []testCase{
 		{
@@ -578,6 +580,23 @@ func TestRoots(t *testing.T) {
 			// According to mpsolve -as -Ga -o 20
 			roots: []float64{-0.26148396910966762037167940747e98},
 		},
+
+		{
+			// This used to hit a bug in our Newton-Raphson implementation. It
+			// used to abort if the new bound was the same as the old bound,
+			// assuming this meant we ran out of precision. However, this can
+			// happen naturally just due to the values the polynomial and its
+			// derivative evaluate to.
+			label: "simple-cubic-1",
+			coefficients: []float64{
+				-3,
+				13,
+				-24,
+				16,
+			},
+			roots:  []float64{0.75},
+			range_: [2]float64{0, 1},
+		},
 	}
 
 	count := func(els []float64, el float64) int {
@@ -623,21 +642,23 @@ func TestRoots(t *testing.T) {
 
 			if len(tt.roots) > 0 {
 				slices.Sort(tt.roots)
-				var x0, x1 float64
-				if tt.roots[0] > 0 {
-					x0 = -tt.roots[0]
-				} else {
-					x0 = tt.roots[0] * 2
-				}
-				if tt.roots[len(tt.roots)-1] > 0 {
-					x1 = tt.roots[len(tt.roots)-1] * 2
-				} else {
-					x1 = -tt.roots[len(tt.roots)-1]
+				x0, x1 := tt.range_[0], tt.range_[1]
+				if x0 == 0 && x1 == 0 {
+					if tt.roots[0] > 0 {
+						x0 = -tt.roots[0]
+					} else {
+						x0 = tt.roots[0] * 2
+					}
+					if tt.roots[len(tt.roots)-1] > 0 {
+						x1 = tt.roots[len(tt.roots)-1] * 2
+					} else {
+						x1 = -tt.roots[len(tt.roots)-1]
+					}
 				}
 				rootsRange := p.Roots(x0, x1, 0, nil)
 				t.Log("got (range):   ", rootsRange)
 				if len(rootsRange) > len(tt.roots) {
-					t.Fatalf("got %d roots but only expected %d", len(roots), len(want))
+					t.Fatalf("got %d roots but only expected %d", len(rootsRange), len(want))
 				}
 
 				for _, r := range rootsRange {
