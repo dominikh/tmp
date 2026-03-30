@@ -445,10 +445,10 @@ func (r RoundedRect) Area() float64 {
 	// subtract the area of the corner under the quarter-circle, and add
 	// back the area of the quarter-circle.
 	return r.Rect.Area() +
-		corner(r.Radii.TopLeft) +
-		corner(r.Radii.TopRight) +
-		corner(r.Radii.BottomRight) +
-		corner(r.Radii.BottomLeft)
+		corner(r.Radii[0]) +
+		corner(r.Radii[1]) +
+		corner(r.Radii[2]) +
+		corner(r.Radii[3])
 }
 
 func dropFirst[T any](seq iter.Seq[T]) iter.Seq[T] {
@@ -486,60 +486,60 @@ func (r RoundedRect) PathElements(tolerance float64) iter.Seq[PathElement] {
 		buildArcIter(
 			2,
 			Point{
-				X: r.Rect.X0 + r.Radii.TopLeft,
-				Y: r.Rect.Y0 + r.Radii.TopLeft,
+				X: r.Rect.X0 + r.Radii[0],
+				Y: r.Rect.Y0 + r.Radii[0],
 			},
 			Vec2{
-				X: r.Radii.TopLeft,
-				Y: r.Radii.TopLeft,
+				X: r.Radii[0],
+				Y: r.Radii[0],
 			},
 		),
 		buildArcIter(
 			3,
 			Point{
-				X: r.Rect.X1 - r.Radii.TopRight,
-				Y: r.Rect.Y0 + r.Radii.TopRight,
+				X: r.Rect.X1 - r.Radii[1],
+				Y: r.Rect.Y0 + r.Radii[1],
 			},
 			Vec2{
-				X: r.Radii.TopRight,
-				Y: r.Radii.TopRight,
+				X: r.Radii[1],
+				Y: r.Radii[1],
 			},
 		),
 		buildArcIter(
 			0,
 			Point{
-				X: r.Rect.X1 - r.Radii.BottomRight,
-				Y: r.Rect.Y1 - r.Radii.BottomRight,
+				X: r.Rect.X1 - r.Radii[2],
+				Y: r.Rect.Y1 - r.Radii[2],
 			},
 			Vec2{
-				X: r.Radii.BottomRight,
-				Y: r.Radii.BottomRight,
+				X: r.Radii[2],
+				Y: r.Radii[2],
 			},
 		),
 		buildArcIter(
 			1,
 			Point{
-				X: r.Rect.X0 + r.Radii.BottomLeft,
-				Y: r.Rect.Y1 - r.Radii.BottomLeft,
+				X: r.Rect.X0 + r.Radii[3],
+				Y: r.Rect.Y1 - r.Radii[3],
 			},
 			Vec2{
-				X: r.Radii.BottomLeft,
-				Y: r.Radii.BottomLeft,
+				X: r.Radii[3],
+				Y: r.Radii[3],
 			},
 		),
 	}
 
 	rect := []PathElement{
 		LineTo(Pt(
-			r.Rect.X1-r.Radii.TopRight,
+			r.Rect.X1-r.Radii[1],
 			r.Rect.Y0,
 		)),
 		LineTo(Pt(
 			r.Rect.X1,
-			r.Rect.Y1-r.Radii.BottomRight,
+			r.Rect.Y1-r.Radii[2],
 		)),
 		LineTo(Pt(
-			r.Rect.X0+r.Radii.BottomLeft,
+			r.Rect.X0+r.Radii[3],
 			r.Rect.Y1,
 		)),
 		ClosePath(),
@@ -548,7 +548,7 @@ func (r RoundedRect) PathElements(tolerance float64) iter.Seq[PathElement] {
 	return func(yield func(PathElement) bool) {
 		e := MoveTo(Pt(
 			r.Rect.X0,
-			r.Rect.Y0+r.Radii.TopLeft,
+			r.Rect.Y0+r.Radii[0],
 		))
 		if !yield(e) {
 			return
@@ -579,10 +579,10 @@ func (r RoundedRect) Perimeter(accuracy float64) float64 {
 	// border surrounding the rounded corner and add the quarter-circle
 	// perimeter.
 	return r.Rect.Perimeter(1.0) +
-		corner(r.Radii.TopLeft) +
-		corner(r.Radii.TopRight) +
-		corner(r.Radii.BottomRight) +
-		corner(r.Radii.BottomLeft)
+		corner(r.Radii[0]) +
+		corner(r.Radii[1]) +
+		corner(r.Radii[2]) +
+		corner(r.Radii[3])
 }
 
 func (rr RoundedRect) Winding(pt Point) int {
@@ -597,13 +597,13 @@ func (rr RoundedRect) Winding(pt Point) int {
 	var radius float64
 	switch {
 	case pt.X < 0.0 && pt.Y < 0.0:
-		radius = rr.Radii.TopLeft
+		radius = rr.Radii[0]
 	case pt.X >= 0.0 && pt.Y < 0.0:
-		radius = rr.Radii.TopRight
+		radius = rr.Radii[1]
 	case pt.X >= 0.0 && pt.Y >= 0.0:
-		radius = rr.Radii.BottomRight
+		radius = rr.Radii[2]
 	case pt.X < 0.0 && pt.Y >= 0.0:
-		radius = rr.Radii.BottomLeft
+		radius = rr.Radii[3]
 	}
 
 	// 3. This is the width and height of a rectangle with one corner at
@@ -647,41 +647,36 @@ func (r RoundedRect) IsNaN() bool {
 	return r.Rect.IsNaN() || r.Radii.IsNaN()
 }
 
-type RoundedRectRadii struct {
-	TopLeft     float64
-	TopRight    float64
-	BottomRight float64
-	BottomLeft  float64
-}
+type RoundedRectRadii [4]float64
 
 func (r RoundedRectRadii) Abs() RoundedRectRadii {
 	return RoundedRectRadii{
-		TopLeft:     math.Abs(r.TopLeft),
-		TopRight:    math.Abs(r.TopRight),
-		BottomLeft:  math.Abs(r.BottomLeft),
-		BottomRight: math.Abs(r.BottomRight),
+		math.Abs(r[0]),
+		math.Abs(r[1]),
+		math.Abs(r[2]),
+		math.Abs(r[3]),
 	}
 }
 
 func (r RoundedRectRadii) Clamp(max float64) RoundedRectRadii {
 	return RoundedRectRadii{
-		TopLeft:     min(r.TopLeft, max),
-		TopRight:    min(r.TopRight, max),
-		BottomLeft:  min(r.BottomLeft, max),
-		BottomRight: min(r.BottomRight, max),
+		min(r[0], max),
+		min(r[1], max),
+		min(r[2], max),
+		min(r[3], max),
 	}
 }
 
 func (r RoundedRectRadii) IsInf() bool {
-	return math.IsInf(r.TopLeft, 0) ||
-		math.IsInf(r.TopRight, 0) ||
-		math.IsInf(r.BottomRight, 0) ||
-		math.IsInf(r.BottomLeft, 0)
+	return math.IsInf(r[0], 0) ||
+		math.IsInf(r[1], 0) ||
+		math.IsInf(r[2], 0) ||
+		math.IsInf(r[3], 0)
 }
 
 func (r RoundedRectRadii) IsNaN() bool {
-	return math.IsNaN(r.TopLeft) ||
-		math.IsNaN(r.TopRight) ||
-		math.IsNaN(r.BottomRight) ||
-		math.IsNaN(r.BottomLeft)
+	return math.IsNaN(r[0]) ||
+		math.IsNaN(r[1]) ||
+		math.IsNaN(r[2]) ||
+		math.IsNaN(r[3])
 }
