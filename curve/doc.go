@@ -121,6 +121,41 @@
 // functionality is particularly useful for font design, as TrueType fonts
 // (unlike OpenType) use quadratic Béziers.
 //
+// # Direction of the y-axis
+//
+// This package is agnostic to whether the y-axis points up or down. Positive
+// angles are defined such that when going in the positive x direction, they
+// point towards positive y. The same applies to oriented area, winding numbers,
+// curvature, etc. For y-up coordinate systems, this results in counterclockwise
+// traversal, while for y-down coordinate systems it results in clockwise
+// traversal.
+//
+//	A = (1, 1)
+//	B = (4, 1)
+//	C = (4, 4)
+//	D = (1, 4)
+//
+//	              y-up             │               y-down
+//	y                              │
+//	^                              │    0-------------------------> x
+//	|                              │    |
+//	|                              │    |  A +------->-------+ B
+//	|  D +-------<-------+ C       │    |    |               |
+//	|    |               |         │    |    ^               v
+//	|    v               ^         │    |    |               |
+//	|    |               |         │    |  D +-------<-------+ C
+//	|  A +------->-------+ B       │    |
+//	|                              │    v
+//	0-------------------------> x  │    y
+//	                               │
+//
+// You can also use [FlipY] (followed by a translation of the origin) to convert
+// between y-up and y-down.
+//
+// We try to avoid using the terms "top" and "bottom" when referring to edges of
+// shapes, as these are only meaningful when specifying the direction of the
+// y-axis.
+//
 // # Iterators
 //
 // Many functions in this package can operate on individual path elements or
