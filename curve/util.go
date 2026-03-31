@@ -4,6 +4,8 @@
 
 package curve
 
+import "math"
+
 func pow2(d float64) float64 { return d * d }
 func pow3(d float64) float64 { return d * d * d }
 func pow4(d float64) float64 { dd := d * d; return dd * dd }
@@ -19,4 +21,13 @@ func pow9(d float64) float64 {
 	dd := d * d
 	dddd := dd * dd
 	return dddd * dddd * d
+}
+
+// normalizeAngle normalizes angles to [0, 2π].
+func normalizeAngle(a Angle) Angle {
+	a = math.Mod(a, 2*math.Pi)
+	if a < 0 {
+		a += 2 * math.Pi
+	}
+	return a
 }

@@ -213,16 +213,28 @@ func (cs CircleSector) Area() float64 {
 }
 
 func (cs CircleSector) BoundingBox() Rect {
-	// todo this is currently not tight
-	r := cs.Radius
-	x := cs.Center.X
-	y := cs.Center.Y
-	return Rect{
-		X0: x - r,
-		Y0: y - r,
-		X1: x + r,
-		Y1: y + r,
+	sweep := cs.SweepAngle
+	end := cs.StartAngle + sweep
+
+	containsAngle := func(a Angle) bool {
+		if sweep >= 0 {
+			return normalizeAngle(a-cs.StartAngle) <= sweep
+		}
+		return normalizeAngle(cs.StartAngle-a) <= -sweep
 	}
+
+	bbox := Rect{1, 1, 0, 0}.
+		UnionPoint(cs.Center).
+		UnionPoint(pointOnCircle(cs.Center, cs.Radius, cs.StartAngle)).
+		UnionPoint(pointOnCircle(cs.Center, cs.Radius, end))
+
+	for _, a := range []Angle{0, math.Pi / 2, math.Pi, 3 * math.Pi / 2} {
+		if containsAngle(a) {
+			bbox = bbox.UnionPoint(pointOnCircle(cs.Center, cs.Radius, a))
+		}
+	}
+
+	return bbox
 }
 
 func (cs CircleSector) Perimeter(accuracy float64) float64 {
