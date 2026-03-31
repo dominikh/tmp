@@ -21,13 +21,13 @@ type Arc struct {
 }
 
 var _ Shape = Arc{}
+var _ ParametricCurve = Arc{}
 
 func (a Arc) Path(tolerance float64) BezPath { return slices.Collect(a.PathElements(tolerance)) }
 
 func (a Arc) PathElements(tolerance float64) iter.Seq[PathElement] {
 	return func(yield func(PathElement) bool) {
-		p0 := sampleEllipse(a.Radii, a.XRotation, a.StartAngle)
-		if !yield(MoveTo(a.Center.Translate(p0))) {
+		if !yield(MoveTo(a.Start())) {
 			return
 		}
 
@@ -39,7 +39,7 @@ func (a Arc) PathElements(tolerance float64) iter.Seq[PathElement] {
 		angleStep := a.SweepAngle / n
 		armLen := math.Copysign((4.0/3.0)*math.Tan(math.Abs(0.25*angleStep)), a.SweepAngle)
 		angle0 := a.StartAngle
-		p0 = sampleEllipse(a.Radii, a.XRotation, angle0)
+		p0 := sampleEllipse(a.Radii, a.XRotation, angle0)
 
 		for range int(n) {
 			angle1 := angle0 + angleStep
@@ -103,4 +103,42 @@ func (a Arc) Reverse() Arc {
 		SweepAngle: -a.SweepAngle,
 		XRotation:  a.XRotation,
 	}
+}
+
+func (a Arc) AngleAt(t float64) float64 {
+	return a.StartAngle + a.SweepAngle*t
+}
+
+func (a Arc) Eval(t float64) Point {
+	return a.Center.Translate(sampleEllipse(a.Radii, a.XRotation, a.AngleAt(t)))
+}
+
+func (a Arc) Subsegment(start, end float64) Arc {
+	return Arc{
+		Center:     a.Center,
+		Radii:      a.Radii,
+		StartAngle: a.AngleAt(start),
+		SweepAngle: a.SweepAngle * (end - start),
+		XRotation:  a.XRotation,
+	}
+}
+
+func (a Arc) SubsegmentCurve(start, end float64) ParametricCurve {
+	return a.Subsegment(start, end)
+}
+
+func (a Arc) Subdivide() (Arc, Arc) {
+	return a.Subsegment(0.0, 0.5), a.Subsegment(0.5, 1.0)
+}
+
+func (a Arc) SubdivideCurve() (ParametricCurve, ParametricCurve) {
+	return a.Subdivide()
+}
+
+func (a Arc) Start() Point {
+	return a.Eval(0)
+}
+
+func (a Arc) End() Point {
+	return a.Eval(1)
 }
