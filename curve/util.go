@@ -4,7 +4,11 @@
 
 package curve
 
-import "math"
+import (
+	"math"
+
+	"honnef.co/go/stuff/math/mathutil"
+)
 
 func pow2(d float64) float64 { return d * d }
 func pow3(d float64) float64 { return d * d * d }
@@ -30,4 +34,8 @@ func normalizeAngle(a Angle) Angle {
 		a += 2 * math.Pi
 	}
 	return a
+}
+
+func clampAngle(a Angle) Angle {
+	return mathutil.Clamp(a, -2*math.Pi, 2*math.Pi)
 }

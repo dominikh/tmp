@@ -101,13 +101,15 @@ func (an Annulus) Winding(pt Point) int {
 	}
 }
 
+// Sector returns a sector of the annulus. The start angle gets
+// normalized to [0, 2π] and the sweep angle gets clamped to [-2π, 2π].
 func (an Annulus) Sector(startAngle, sweepAngle Angle) AnnulusSector {
 	return AnnulusSector{
 		Center:      an.Center,
 		OuterRadius: an.OuterRadius,
 		InnerRadius: an.InnerRadius,
-		StartAngle:  startAngle,
-		SweepAngle:  sweepAngle,
+		StartAngle:  normalizeAngle(startAngle),
+		SweepAngle:  clampAngle(sweepAngle),
 	}
 }
 
@@ -135,8 +137,8 @@ func (as AnnulusSector) OuterArc() Arc {
 	return Arc{
 		Center:     as.Center,
 		Radii:      Vec2{as.OuterRadius, as.OuterRadius},
-		StartAngle: as.StartAngle,
-		SweepAngle: as.SweepAngle,
+		StartAngle: normalizeAngle(as.StartAngle),
+		SweepAngle: clampAngle(as.SweepAngle),
 		XRotation:  0.0,
 	}
 }
@@ -151,42 +153,62 @@ func (as AnnulusSector) InnerArc() Arc {
 	return Arc{
 		Center:     as.Center,
 		Radii:      Vec2{as.InnerRadius, as.InnerRadius},
-		StartAngle: as.StartAngle + as.SweepAngle,
-		SweepAngle: -as.SweepAngle,
+		StartAngle: normalizeAngle(as.StartAngle + clampAngle(as.SweepAngle)),
+		SweepAngle: -clampAngle(as.SweepAngle),
 		XRotation:  0.0,
 	}
 }
 
 // PathElements implements Shape.
 func (as AnnulusSector) PathElements(tolerance float64) iter.Seq[PathElement] {
-	return func(yield func(PathElement) bool) {
-		if !yield(MoveTo(pointOnCircle(as.Center, as.InnerRadius, as.StartAngle))) {
-			return
-		}
-
-		// First radius
-		if !yield(LineTo(pointOnCircle(as.Center, as.OuterRadius, as.StartAngle))) {
-			return
-		}
-
-		// Outer arc
-		a := as.OuterArc()
-		for el := range dropFirst(a.PathElements(tolerance)) {
-			if !yield(el) {
+	if math.Abs(as.SweepAngle) < 2*math.Pi {
+		return func(yield func(PathElement) bool) {
+			if !yield(MoveTo(pointOnCircle(as.Center, as.InnerRadius, as.StartAngle))) {
 				return
 			}
-		}
 
-		// Second radius
-		if !yield(LineTo(pointOnCircle(as.Center, as.InnerRadius, as.StartAngle+as.SweepAngle))) {
-			return
-		}
-
-		// Inner arc
-		a = as.InnerArc()
-		for el := range dropFirst(a.PathElements(tolerance)) {
-			if !yield(el) {
+			// First radius
+			if !yield(LineTo(pointOnCircle(as.Center, as.OuterRadius, as.StartAngle))) {
 				return
+			}
+
+			// Outer arc
+			a := as.OuterArc()
+			for el := range dropFirst(a.PathElements(tolerance)) {
+				if !yield(el) {
+					return
+				}
+			}
+
+			// Second radius
+			if !yield(LineTo(pointOnCircle(as.Center, as.InnerRadius, as.StartAngle+as.SweepAngle))) {
+				return
+			}
+
+			// Inner arc
+			a = as.InnerArc()
+			for el := range dropFirst(a.PathElements(tolerance)) {
+				if !yield(el) {
+					return
+				}
+			}
+		}
+	} else {
+		return func(yield func(PathElement) bool) {
+			// Outer arc
+			a := as.OuterArc()
+			for el := range a.PathElements(tolerance) {
+				if !yield(el) {
+					return
+				}
+			}
+
+			// Inner arc
+			a = as.InnerArc()
+			for el := range a.PathElements(tolerance) {
+				if !yield(el) {
+					return
+				}
 			}
 		}
 	}
@@ -233,12 +255,13 @@ func (as AnnulusSector) BoundingBox() Rect {
 func (as AnnulusSector) Perimeter(accuracy float64) float64 {
 	return 2.0*
 		(as.OuterRadius-as.InnerRadius) +
-		as.SweepAngle*(as.InnerRadius+as.OuterRadius)
+		clampAngle(as.SweepAngle)*(as.InnerRadius+as.OuterRadius)
 }
 
 func (as AnnulusSector) Winding(pt Point) int {
 	angle := pt.Sub(as.Center).Angle()
-	if angle < as.StartAngle || angle > as.StartAngle+as.SweepAngle {
+	if angle < normalizeAngle(as.StartAngle) ||
+		angle > normalizeAngle(as.StartAngle+clampAngle(as.SweepAngle)) {
 		return 0
 	}
 	dist2 := pt.Sub(as.Center).Hypot2()

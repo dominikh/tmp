@@ -35,10 +35,10 @@ func (a Arc) PathElements(tolerance float64) iter.Seq[PathElement] {
 		// Number of subdivisions per ellipse based on error tolerance.
 		// Note: this may slightly underestimate the error for quadrants.
 		nError := max(math.Pow(1.1163*scaledError, 1.0/6.0), 3.999_999)
-		n := math.Ceil(nError * math.Abs(a.SweepAngle) * (1.0 / (2.0 * math.Pi)))
-		angleStep := a.SweepAngle / n
-		armLen := math.Copysign((4.0/3.0)*math.Tan(math.Abs(0.25*angleStep)), a.SweepAngle)
-		angle0 := a.StartAngle
+		n := math.Ceil(nError * math.Abs(clampAngle(a.SweepAngle)) * (1.0 / (2.0 * math.Pi)))
+		angleStep := clampAngle(a.SweepAngle) / n
+		armLen := math.Copysign((4.0/3.0)*math.Tan(math.Abs(0.25*angleStep)), clampAngle(a.SweepAngle))
+		angle0 := normalizeAngle(a.StartAngle)
 		p0 := sampleEllipse(a.Radii, a.XRotation, angle0)
 
 		for range int(n) {
@@ -99,14 +99,14 @@ func (a Arc) Reverse() Arc {
 	return Arc{
 		Center:     a.Center,
 		Radii:      a.Radii,
-		StartAngle: a.StartAngle + a.SweepAngle,
-		SweepAngle: -a.SweepAngle,
+		StartAngle: normalizeAngle(a.StartAngle + clampAngle(a.SweepAngle)),
+		SweepAngle: -clampAngle(a.SweepAngle),
 		XRotation:  a.XRotation,
 	}
 }
 
 func (a Arc) AngleAt(t float64) float64 {
-	return a.StartAngle + a.SweepAngle*t
+	return normalizeAngle(a.StartAngle + clampAngle(a.SweepAngle)*t)
 }
 
 func (a Arc) Eval(t float64) Point {
@@ -118,7 +118,7 @@ func (a Arc) Subsegment(start, end float64) Arc {
 		Center:     a.Center,
 		Radii:      a.Radii,
 		StartAngle: a.AngleAt(start),
-		SweepAngle: a.SweepAngle * (end - start),
+		SweepAngle: clampAngle(clampAngle(a.SweepAngle) * (end - start)),
 		XRotation:  a.XRotation,
 	}
 }

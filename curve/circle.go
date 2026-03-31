@@ -10,8 +10,6 @@ import (
 	"iter"
 	"math"
 	"slices"
-
-	"honnef.co/go/stuff/math/mathutil"
 )
 
 type Circle struct {
@@ -77,12 +75,14 @@ func (c Circle) PathElements(tolerance float64) iter.Seq[PathElement] {
 	}
 }
 
+// Sector returns a sector of the circle. The start angle gets
+// normalized to [0, 2π] and the sweep angle gets clamped to [-2π, 2π].
 func (c Circle) Sector(startAngle, sweepAngle Angle) CircleSector {
 	return CircleSector{
 		Center:     c.Center,
 		Radius:     c.Radius,
-		StartAngle: startAngle,
-		SweepAngle: sweepAngle,
+		StartAngle: normalizeAngle(startAngle),
+		SweepAngle: clampAngle(sweepAngle),
 	}
 }
 
@@ -156,34 +156,38 @@ func (cs CircleSector) Arc() Arc {
 	return Arc{
 		Center:     cs.Center,
 		Radii:      Vec2{cs.Radius, cs.Radius},
-		StartAngle: cs.StartAngle,
-		SweepAngle: cs.SweepAngle,
+		StartAngle: normalizeAngle(cs.StartAngle),
+		SweepAngle: clampAngle(cs.SweepAngle),
 		XRotation:  0.0,
 	}
 }
 
 // PathElements implements Shape.
 func (cs CircleSector) PathElements(tolerance float64) iter.Seq[PathElement] {
-	return func(yield func(PathElement) bool) {
-		if !yield(MoveTo(cs.Center)) {
-			return
-		}
-		if !yield(LineTo(pointOnCircle(cs.Center, cs.Radius, cs.StartAngle))) {
-			return
-		}
-		a := cs.Arc()
-		for el := range dropFirst(a.PathElements(tolerance)) {
-			if !yield(el) {
+	if math.Abs(cs.SweepAngle) < 2*math.Pi {
+		return func(yield func(PathElement) bool) {
+			if !yield(MoveTo(cs.Center)) {
+				return
+			}
+			if !yield(LineTo(pointOnCircle(cs.Center, cs.Radius, cs.StartAngle))) {
+				return
+			}
+			a := cs.Arc()
+			for el := range dropFirst(a.PathElements(tolerance)) {
+				if !yield(el) {
+					return
+				}
+			}
+			if !yield(LineTo(cs.Center)) {
 				return
 			}
 		}
-		if !yield(LineTo(cs.Center)) {
-			return
-		}
+	} else {
+		return cs.Arc().PathElements(tolerance)
 	}
 }
 
-func pointOnCircle(center Point, radius float64, angle float64) Point {
+func pointOnCircle(center Point, radius float64, angle Angle) Point {
 	sin, cos := math.Sincos(angle)
 	return center.Translate(
 		Vec2{
@@ -212,15 +216,16 @@ func (cs CircleSector) Translate(v Vec2) CircleSector {
 }
 
 func (cs CircleSector) Area() float64 {
-	return 0.5 * cs.Radius * cs.Radius * cs.SweepAngle
+	return 0.5 * cs.Radius * cs.Radius * clampAngle(cs.SweepAngle)
 }
 
 func (cs CircleSector) BoundingBox() Rect {
+	sweep := clampAngle(cs.SweepAngle)
 	containsAngle := func(a Angle) bool {
-		if cs.SweepAngle >= 0 {
-			return normalizeAngle(a-cs.StartAngle) <= cs.SweepAngle
+		if sweep >= 0 {
+			return normalizeAngle(a-cs.StartAngle) <= sweep
 		}
-		return normalizeAngle(cs.StartAngle-a) <= -cs.SweepAngle
+		return normalizeAngle(cs.StartAngle-a) <= -sweep
 	}
 
 	bbox := Rect{1, 1, 0, 0}.
@@ -238,12 +243,12 @@ func (cs CircleSector) BoundingBox() Rect {
 }
 
 func (cs CircleSector) Perimeter(accuracy float64) float64 {
-	return 2.0*cs.Radius + cs.SweepAngle*cs.Radius
+	return 2.0*cs.Radius + clampAngle(cs.SweepAngle)*cs.Radius
 }
 
 func (cs CircleSector) Winding(pt Point) int {
 	angle := pt.Sub(cs.Center).Angle()
-	if angle < cs.StartAngle || angle > cs.StartAngle+cs.SweepAngle {
+	if angle < normalizeAngle(cs.StartAngle) || angle > normalizeAngle(cs.StartAngle+clampAngle(cs.SweepAngle)) {
 		return 0
 	}
 	dist2 := pt.Sub(cs.Center).Hypot2()
@@ -265,7 +270,7 @@ func (cs CircleSector) End() Point {
 }
 
 func (cs CircleSector) AngleAt(t float64) Angle {
-	return normalizeAngle(cs.StartAngle + mathutil.Clamp(cs.SweepAngle, -2*math.Pi, 2*math.Pi)*t)
+	return normalizeAngle(cs.StartAngle + clampAngle(cs.SweepAngle)*t)
 }
 
 // Eval implements [ParametricCurve].
@@ -288,7 +293,7 @@ func (cs CircleSector) Subsegment(start float64, end float64) CircleSector {
 		Center:     cs.Center,
 		Radius:     cs.Radius,
 		StartAngle: cs.AngleAt(start),
-		SweepAngle: cs.SweepAngle * (end - start),
+		SweepAngle: clampAngle(cs.SweepAngle) * (end - start),
 	}
 }
 
