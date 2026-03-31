@@ -12,6 +12,16 @@ import (
 	"slices"
 )
 
+// Rect describes a rectangle defined by its minimum and maximum coordinates.
+//
+// It is possible to construct rectangles with negative width or height. Many
+// functions will treat rectangles that have at least one negative dimension as
+// non-existent. Such rectangles cannot overlap, intersect, or union with other
+// rectangles, among other things.
+//
+// [Rect.Area] does return meaningful values for rectangles with negative
+// dimensions, since it is defined as width × height. If exactly one of the
+// dimensions is negative, the area will be, too.
 type Rect struct {
 	X0, Y0 float64
 	X1, Y1 float64
@@ -122,6 +132,9 @@ func (r Rect) Center() Point {
 	}
 }
 
+// Contains reports whether r contains the point pt.
+//
+// Non-existent rectangles do not contain any points.
 func (r Rect) Contains(pt Point) bool {
 	return pt.X >= r.X0 &&
 		pt.X < r.X1 &&
@@ -131,8 +144,16 @@ func (r Rect) Contains(pt Point) bool {
 
 // Union returns the smallest rectangle enclosing r and o.
 //
-// Results are valid only if width and height are non-negative.
+// If one of r or o is non-existent, the other will be returned. If both are
+// non-existent, the result will be some not further defined non-existent
+// rectangle.
 func (r Rect) Union(o Rect) Rect {
+	if !r.Exists() {
+		return o
+	}
+	if !o.Exists() {
+		return r
+	}
 	return Rect{
 		X0: min(r.X0, o.X0),
 		Y0: min(r.Y0, o.Y0),
@@ -143,12 +164,24 @@ func (r Rect) Union(o Rect) Rect {
 
 // UnionPoint computes the union with one point.
 //
-// This method includes the perimeter of zero-area rectangles.
-// Thus, a succession of UnionPoint operations on a series of
-// points yields their enclosing rectangle.
+// Rectangles with no area still contribute to the result. For example:
 //
-// Results are valid only if width and height are non-negative.
+//	r := Rect{0, 0, 0, 0}
+//	pt := Point{2, 2}
+//	r2 := r.UnionPoint(pt)
+//	// r2 == Rect{0, 0, 2, 2}
+//
+// Non-existant rectangles, on the other hand, do not contribute to the result.
+// For example:
+//
+//	r := Rect{1, 1, 0, 0}
+//	pt := Point{2, 2}
+//	r2 := r.UnionPoint(pt)
+//	// r2 == Rect{2, 2, 2, 2}
 func (r Rect) UnionPoint(pt Point) Rect {
+	if !r.Exists() {
+		return NewRectFromPoints(pt, pt)
+	}
 	return Rect{
 		X0: min(r.X0, pt.X),
 		Y0: min(r.Y0, pt.Y),
@@ -312,6 +345,11 @@ func (r Rect) IsNaN() bool {
 		math.IsNaN(r.X1) ||
 		math.IsNaN(r.Y0) ||
 		math.IsNaN(r.Y1)
+}
+
+// Exists returns true if the rectangle doesn't have any negative dimensions.
+func (r Rect) Exists() bool {
+	return r.Width() >= 0 && r.Height() >= 0
 }
 
 func (r Rect) Translate(v Vec2) Rect {
