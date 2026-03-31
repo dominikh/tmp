@@ -10,6 +10,8 @@ import (
 	"iter"
 	"math"
 	"slices"
+
+	"honnef.co/go/stuff/math/mathutil"
 )
 
 type Circle struct {
@@ -139,6 +141,7 @@ type CircleSector struct {
 }
 
 var _ ClosedShape = CircleSector{}
+var _ ParametricCurve = CircleSector{}
 
 // Contains implements ClosedShape.
 func (cs CircleSector) Contains(pt Point) bool {
@@ -213,20 +216,17 @@ func (cs CircleSector) Area() float64 {
 }
 
 func (cs CircleSector) BoundingBox() Rect {
-	sweep := cs.SweepAngle
-	end := cs.StartAngle + sweep
-
 	containsAngle := func(a Angle) bool {
-		if sweep >= 0 {
-			return normalizeAngle(a-cs.StartAngle) <= sweep
+		if cs.SweepAngle >= 0 {
+			return normalizeAngle(a-cs.StartAngle) <= cs.SweepAngle
 		}
-		return normalizeAngle(cs.StartAngle-a) <= -sweep
+		return normalizeAngle(cs.StartAngle-a) <= -cs.SweepAngle
 	}
 
 	bbox := Rect{1, 1, 0, 0}.
 		UnionPoint(cs.Center).
-		UnionPoint(pointOnCircle(cs.Center, cs.Radius, cs.StartAngle)).
-		UnionPoint(pointOnCircle(cs.Center, cs.Radius, end))
+		UnionPoint(cs.Eval(0)).
+		UnionPoint(cs.Eval(1))
 
 	for _, a := range []Angle{0, math.Pi / 2, math.Pi, 3 * math.Pi / 2} {
 		if containsAngle(a) {
@@ -252,4 +252,47 @@ func (cs CircleSector) Winding(pt Point) int {
 	} else {
 		return 0
 	}
+}
+
+// Start implements [ParametricCurve].
+func (cs CircleSector) Start() Point {
+	return cs.Eval(0)
+}
+
+// End implements [ParametricCurve].
+func (cs CircleSector) End() Point {
+	return cs.Eval(1)
+}
+
+func (cs CircleSector) AngleAt(t float64) Angle {
+	return normalizeAngle(cs.StartAngle + mathutil.Clamp(cs.SweepAngle, -2*math.Pi, 2*math.Pi)*t)
+}
+
+// Eval implements [ParametricCurve].
+func (cs CircleSector) Eval(t float64) Point {
+	a := cs.AngleAt(t)
+	return pointOnCircle(cs.Center, cs.Radius, a)
+}
+
+func (cs CircleSector) Subdivide() (CircleSector, CircleSector) {
+	return cs.Subsegment(0.0, 0.5), cs.Subsegment(0.5, 1.0)
+}
+
+// SubdivideCurve implements [ParametricCurve].
+func (cs CircleSector) SubdivideCurve() (ParametricCurve, ParametricCurve) {
+	return cs.Subdivide()
+}
+
+func (cs CircleSector) Subsegment(start float64, end float64) CircleSector {
+	return CircleSector{
+		Center:     cs.Center,
+		Radius:     cs.Radius,
+		StartAngle: cs.AngleAt(start),
+		SweepAngle: cs.SweepAngle * (end - start),
+	}
+}
+
+// SubsegmentCurve implements [ParametricCurve].
+func (cs CircleSector) SubsegmentCurve(start float64, end float64) ParametricCurve {
+	return cs.Subsegment(start, end)
 }
