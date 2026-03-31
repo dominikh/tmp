@@ -155,3 +155,179 @@ func TestRoundedRectBeziers(t *testing.T) {
 		t.Errorf("got winding %d, expected 1", w)
 	}
 }
+
+func TestRect_Overlaps(t *testing.T) {
+	tests := []struct {
+		name string // description of this test case
+		r    Rect
+		o    Rect
+		want bool
+	}{
+		// Abutting rectangles do not overlap. (Test names assume a y-down
+		// coordinate system)
+		{
+			"abutting-top",
+			Rect{0, 0, 1, 1},
+			Rect{0, -1, 1, 0},
+			false,
+		},
+		{
+			"abutting-right",
+			Rect{0, 0, 1, 1},
+			Rect{1, 0, 2, 1},
+			false,
+		},
+		{
+			"abutting-bottom",
+			Rect{0, 0, 1, 1},
+			Rect{0, 1, 1, 2},
+			false,
+		},
+		{
+			"abutting-left",
+			Rect{0, 0, 1, 1},
+			Rect{-1, 0, 0, 1},
+			false,
+		},
+		{
+			"abutting-top-left",
+			Rect{0, 0, 1, 1},
+			Rect{-1, -1, 0, 0},
+			false,
+		},
+		{
+			"abutting-top-right",
+			Rect{0, 0, 1, 1},
+			Rect{1, -1, 2, 0},
+			false,
+		},
+		{
+			"abutting-bottom-right",
+			Rect{0, 0, 1, 1},
+			Rect{1, 1, 2, 2},
+			false,
+		},
+		{
+			"abutting-bottom-left",
+			Rect{0, 0, 1, 1},
+			Rect{-1, 1, 0, 2},
+			false,
+		},
+
+		// o inside r
+		{
+			"o-inside-r",
+			Rect{0, 0, 1, 1},
+			Rect{0.25, 0.25, 0.75, 0.75},
+			true,
+		},
+
+		// r inside o
+		{
+			"r-inside-o",
+			Rect{0, 0, 1, 1},
+			Rect{-1, -1, 2, 2},
+			true,
+		},
+
+		// o inside r with a shared edge
+		{
+			"o-inside-r-shared-edge",
+			Rect{0, 0, 1, 1},
+			Rect{0, 0.25, 0.5, 0.75},
+			true,
+		},
+
+		// Identical rects
+		{
+			"identical",
+			Rect{0, 0, 1, 1},
+			Rect{0, 0, 1, 1},
+			true,
+		},
+
+		// All the ways of overlapping
+		{
+			"overlap-top",
+			Rect{0, 0, 1, 1},
+			Rect{0.25, -0.25, 0.75, 0.25},
+			true,
+		},
+		{
+			"overlap-right",
+			Rect{0, 0, 1, 1},
+			Rect{0.75, 0.25, 1.25, 0.75},
+			true,
+		},
+		{
+			"overlap-bottom",
+			Rect{0, 0, 1, 1},
+			Rect{0.25, 0.75, 0.75, 1.25},
+			true,
+		},
+		{
+			"overlap-left",
+			Rect{0, 0, 1, 1},
+			Rect{-0.25, 0.25, 0.25, 0.75},
+			true,
+		},
+		{
+			"overlap-top-left",
+			Rect{0, 0, 1, 1},
+			Rect{-0.25, -0.25, 0.25, 0.25},
+			true,
+		},
+		{
+			"overlap-top-right",
+			Rect{0, 0, 1, 1},
+			Rect{0.75, -0.25, 1.25, 0.25},
+			true,
+		},
+		{
+			"overlap-bottom-right",
+			Rect{0, 0, 1, 1},
+			Rect{0.75, 0.75, 1.25, 1.25},
+			true,
+		},
+		{
+			"overlap-bottom-left",
+			Rect{0, 0, 1, 1},
+			Rect{-0.25, 0.75, 0.25, 1.25},
+			true,
+		},
+
+		// A point does not overlap a rectangle and vice versa
+		{
+			"singularity",
+			Rect{0, 0, 1, 1},
+			Rect{0.5, 0.5, 0.5, 0.5},
+			false,
+		},
+
+		// Non-existent rectangles don't overlap
+		{
+			"mixed-signs",
+			Rect{0, 0, 1, 1},
+			Rect{0.25, 0.75, 0.75, 0.25},
+			false,
+		},
+		{
+			"both-negative",
+			Rect{0, 1, 1, 0},
+			Rect{0.25, 0.75, 0.75, 0.25},
+			false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.r.Overlaps(tt.o)
+			if got != tt.want {
+				t.Errorf("%s: %v.Overlaps(%v) = %v, want %v", tt.name, tt.r, tt.o, got, tt.want)
+			}
+			if tt.o.Overlaps(tt.r) != got {
+				t.Errorf("%s: r.Overlaps(o) != o.Overlaps(r)", tt.name)
+			}
+		})
+	}
+}

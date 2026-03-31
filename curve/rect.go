@@ -142,6 +142,13 @@ func (r Rect) Contains(pt Point) bool {
 		pt.Y < r.Y1
 }
 
+// Overlaps reports whether r and o overlap. Two rectangles overlap if their
+// intersection is non-empty.
+func (r Rect) Overlaps(o Rect) bool {
+	return min(r.X1, o.X1) > max(r.X0, o.X0) &&
+		min(r.Y1, o.Y1) > max(r.Y0, o.Y0)
+}
+
 // Union returns the smallest rectangle enclosing r and o.
 //
 // If one of r or o is non-existent, the other will be returned. If both are
