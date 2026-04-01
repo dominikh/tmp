@@ -1,1 +1,5 @@
+// SPDX-FileCopyrightText: 2025 Dominik Honnef and contributors
+//
+// SPDX-License-Identifier: MIT
+
 package debug
