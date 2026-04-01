@@ -46,6 +46,18 @@ func checkPointNear(t *testing.T, got, want Point) {
 	}
 }
 
+func checkRectNear(t *testing.T, got, want Rect) {
+	t.Helper()
+
+	const epsilon = 1e-12
+	if math.Abs(got.X0-want.X0) > epsilon ||
+		math.Abs(got.Y0-want.Y0) > epsilon ||
+		math.Abs(got.X1-want.X1) > epsilon ||
+		math.Abs(got.Y1-want.Y1) > epsilon {
+		t.Fatalf("got %#v, want %#v", got, want)
+	}
+}
+
 func TestArcEndpointsAndMidpoint(t *testing.T) {
 	arc := Arc{Pt(3.0, -2.0), Vec(4.0, 1.5), math.Pi / 6.0, math.Pi, 0.0}
 	checkPointNear(t, arc.Eval(0.0), arc.Start())
@@ -136,5 +148,64 @@ func TestArcSubsegmentMatchesOriginal(t *testing.T) {
 		}
 		checkPointNear(t, subsegment.Start(), tt.arc.Eval(tt.start))
 		checkPointNear(t, subsegment.End(), tt.arc.Eval(tt.end))
+	}
+}
+
+func TestArcBoundingBoxAxisAlignedQuarter(t *testing.T) {
+	arc := Arc{
+		Center:     Pt(1, 2),
+		Radii:      Vec(3, 4),
+		StartAngle: 0,
+		SweepAngle: math.Pi / 2,
+		XRotation:  0,
+	}
+
+	got := arc.BoundingBox()
+	want := Rect{X0: 1, Y0: 2, X1: 4, Y1: 6}
+	checkRectNear(t, got, want)
+}
+
+func TestArcBoundingBoxFullArcMatchesEllipse(t *testing.T) {
+	arc := Arc{
+		Center:     Pt(5, 7),
+		Radii:      Vec(3, 2),
+		StartAngle: math.Pi / 6,
+		SweepAngle: 2 * math.Pi,
+		XRotation:  math.Pi / 4,
+	}
+
+	got := arc.BoundingBox()
+	want := NewEllipse(arc.Center, arc.Radii, arc.XRotation).BoundingBox()
+	checkRectNear(t, got, want)
+}
+
+func TestArcBoundingBoxContainsSamples(t *testing.T) {
+	testCases := []Arc{
+		{
+			Center:     Pt(2, 3),
+			Radii:      Vec(4, 1),
+			StartAngle: math.Pi / 6,
+			SweepAngle: math.Pi,
+			XRotation:  math.Pi / 4,
+		},
+		{
+			Center:     Pt(-1, 4),
+			Radii:      Vec(5, 3),
+			StartAngle: 1.7,
+			SweepAngle: -1.3 * math.Pi,
+			XRotation:  math.Pi / 7,
+		},
+	}
+
+	const samples = 10000
+	const epsilon = 1e-9
+	for _, arc := range testCases {
+		bbox := arc.BoundingBox()
+		for i := range samples + 1 {
+			pt := arc.Eval(float64(i) / samples)
+			if pt.X < bbox.X0-epsilon || pt.X > bbox.X1+epsilon || pt.Y < bbox.Y0-epsilon || pt.Y > bbox.Y1+epsilon {
+				t.Fatalf("BoundingBox() = %#v does not contain point %v on arc %#v", bbox, pt, arc)
+			}
+		}
 	}
 }

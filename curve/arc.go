@@ -80,7 +80,47 @@ func rotatePt(pt Vec2, angle Angle) Vec2 {
 }
 
 func (a Arc) BoundingBox() Rect {
-	panic("not implemented")
+	bbox := NewRectFromPoints(a.Start(), a.End())
+
+	start := normalizeAngle(a.StartAngle)
+	sweep := clampAngle(a.SweepAngle)
+	if math.Abs(sweep) == 2*math.Pi {
+		return NewEllipse(a.Center, a.Radii, a.XRotation).BoundingBox()
+	}
+
+	containsAngle := func(angle Angle) bool {
+		angle = normalizeAngle(angle)
+		if sweep >= 0 {
+			end := start + sweep
+			if end <= 2*math.Pi {
+				return angle >= start && angle <= end
+			}
+			return angle >= start || angle <= normalizeAngle(end)
+		}
+
+		end := start + sweep
+		if end >= 0 {
+			return angle <= start && angle >= end
+		}
+		return angle <= start || angle >= normalizeAngle(end)
+	}
+
+	// These are the angles where the rotated ellipse reaches an extremum
+	// in x or y. A tight bounding box can only change at the arc endpoints or at
+	// one of these stationary points, so we test each extremum and keep only those
+	// that lie on the swept portion of the ellipse.
+	for _, angle := range [...]Angle{
+		math.Atan2(-a.Radii.Y*math.Sin(a.XRotation), a.Radii.X*math.Cos(a.XRotation)),
+		math.Atan2(-a.Radii.Y*math.Sin(a.XRotation), a.Radii.X*math.Cos(a.XRotation)) + math.Pi,
+		math.Atan2(a.Radii.Y*math.Cos(a.XRotation), a.Radii.X*math.Sin(a.XRotation)),
+		math.Atan2(a.Radii.Y*math.Cos(a.XRotation), a.Radii.X*math.Sin(a.XRotation)) + math.Pi,
+	} {
+		if containsAngle(angle) {
+			bbox = bbox.UnionPoint(a.Center.Translate(sampleEllipse(a.Radii, a.XRotation, angle)))
+		}
+	}
+
+	return bbox
 }
 
 func (a Arc) Perimeter(accuracy float64) float64 {

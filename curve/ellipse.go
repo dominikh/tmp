@@ -113,7 +113,7 @@ func (e Ellipse) Area() float64 {
 func (e Ellipse) BoundingBox() Rect {
 	// Compute a tight bounding box of the ellipse.
 	//
-	// See https://www.iquilezles.org/www/articles/ellipses/ellipses.htm. We can get the two
+	// See https://www.iquilezles.org/articles/ellipses/. We can get the two
 	// radius vectors by applying the affine map to the two impulses (1, 0) and (0, 1) which gives
 	// (a, b) and (c, d) if the affine map is
 	//
