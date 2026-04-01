@@ -37,10 +37,6 @@ func (q QuadBez) PathElements(tolerance float64) iter.Seq[PathElement] {
 	}
 }
 
-func (q QuadBez) Perimeter(accuracy float64) float64 {
-	return q.Arclen(accuracy)
-}
-
 // Raise raises the order by one, returning a cubic Bézier segment that exactly
 // represents this quadratic.
 func (q QuadBez) Raise() CubicBez {
@@ -60,14 +56,14 @@ func (q QuadBez) IsNaN() bool {
 	return q.P0.IsNaN() || q.P1.IsNaN() || q.P2.IsNaN()
 }
 
-// Arclen returns the arclength of the quadratic Bézier segment.
+// PathLength returns the arc length of the quadratic Bézier segment.
 //
 // This computation is based on an analytical formula. Since that formula suffers
 // from numerical instability when the curve is very close to a straight line, we
 // detect that case and fall back to Legendre-Gauss quadrature.
 //
 // Overall accuracy should be better than 1e-13 over the entire range.
-func (q QuadBez) Arclen(accuracy float64) float64 {
+func (q QuadBez) PathLength(accuracy float64) float64 {
 	d2 := Vec2(q.P0).Sub(Vec2(q.P1).Mul(2)).Add(Vec2(q.P2))
 	a := d2.Hypot2()
 	d1 := q.P1.Sub(q.P0)
@@ -75,7 +71,7 @@ func (q QuadBez) Arclen(accuracy float64) float64 {
 	if a < 5e-4*c {
 		// This case happens for nearly straight Béziers.
 		//
-		// Calculate arclength using Legendre-Gauss quadrature using formula from Behdad
+		// Calculate arc length using Legendre-Gauss quadrature using formula from Behdad
 		// in https://github.com/Pomax/BezierInfo-2/issues/77
 		v0 := Vec2(q.P0).Mul(-0.492943519233745).
 			Add(Vec2(q.P1).Mul(0.430331482911935)).

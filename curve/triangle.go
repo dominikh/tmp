@@ -139,7 +139,7 @@ func (t Triangle) Transform(aff Affine) Triangle {
 	}
 }
 
-func (t Triangle) Perimeter(accuracy float64) float64 {
+func (t Triangle) PathLength(accuracy float64) float64 {
 	return t.P0.Distance(t.P1) + t.P1.Distance(t.P2) + t.P2.Distance(t.P0)
 }
 

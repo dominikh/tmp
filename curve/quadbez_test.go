@@ -22,7 +22,7 @@ func TestQuadBezArclen(t *testing.T) {
 	want := 0.5*math.Sqrt(5.0) + 0.25*math.Log(2.0+math.Sqrt(5.0))
 	for i := range 12 {
 		accuracy := math.Pow(0.1, float64(i))
-		est := q.Arclen(accuracy)
+		est := q.PathLength(accuracy)
 		error := math.Abs(est - want)
 		if error > accuracy {
 			t.Errorf("got error %g for desired accuracy of %g", error, accuracy)
@@ -38,7 +38,7 @@ func TestQuadBezArclenPathological(t *testing.T) {
 	}
 	const want = 2.0008737864167325 // A rough empirical calculation
 	const accuracy = 1e-11
-	est := q.Arclen(accuracy)
+	est := q.PathLength(accuracy)
 	error := math.Abs(est - want)
 	if error > accuracy {
 		t.Errorf("got error %g for desired accuracy of %g", error, accuracy)

@@ -376,7 +376,7 @@ func (r Rect) BoundingBox() Rect {
 	return r.Abs()
 }
 
-func (r Rect) Perimeter(accuracy float64) float64 {
+func (r Rect) PathLength(accuracy float64) float64 {
 	return 2 * (math.Abs(r.Width()) + math.Abs(r.Height()))
 }
 
@@ -615,7 +615,7 @@ func (r RoundedRect) PathElements(tolerance float64) iter.Seq[PathElement] {
 	}
 }
 
-func (r RoundedRect) Perimeter(accuracy float64) float64 {
+func (r RoundedRect) PathLength(accuracy float64) float64 {
 	corner := func(radius float64) float64 {
 		return (-2.0 + math.Pi/2) * radius * radius
 	}
@@ -623,7 +623,7 @@ func (r RoundedRect) Perimeter(accuracy float64) float64 {
 	// Start with the full perimeter. For each corner, subtract the
 	// border surrounding the rounded corner and add the quarter-circle
 	// perimeter.
-	return r.Rect.Perimeter(1.0) +
+	return r.Rect.PathLength(1.0) +
 		corner(r.Radii[0]) +
 		corner(r.Radii[1]) +
 		corner(r.Radii[2]) +

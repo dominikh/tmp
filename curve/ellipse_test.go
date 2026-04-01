@@ -72,7 +72,7 @@ func BenchmarkEllipsePerimeter(b *testing.B) {
 	for _, accuracy := range []float64{1e-5, 1e-8, 1e-20} {
 		b.Run(fmt.Sprintf("accuracy=%e", accuracy), func(b *testing.B) {
 			for b.Loop() {
-				e.Perimeter(accuracy)
+				e.PathLength(accuracy)
 			}
 		})
 	}

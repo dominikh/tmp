@@ -123,7 +123,7 @@ func (a Arc) BoundingBox() Rect {
 	return bbox
 }
 
-func (a Arc) Perimeter(accuracy float64) float64 {
+func (a Arc) PathLength(accuracy float64) float64 {
 	if a.SweepAngle == 0 {
 		return 0
 	}
@@ -138,7 +138,7 @@ func (a Arc) Perimeter(accuracy float64) float64 {
 		return radii.X * sweepAngle
 	}
 	if sweepAngle == 2*math.Pi {
-		return NewEllipse(a.Center, radii, a.XRotation).Perimeter(accuracy)
+		return NewEllipse(a.Center, radii, a.XRotation).PathLength(accuracy)
 	}
 
 	integrand := func(theta Angle) float64 {

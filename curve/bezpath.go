@@ -170,11 +170,6 @@ func (seg PathSegment) PathElements(tolerance float64) iter.Seq[PathElement] {
 	}
 }
 
-// Perimeter implements Shape.
-func (seg PathSegment) Perimeter(accuracy float64) float64 {
-	return seg.Arclen(accuracy)
-}
-
 var _ Shape = PathSegment{}
 var _ ParametricCurve = PathSegment{}
 
@@ -266,27 +261,27 @@ func (seg PathSegment) SubdivideCurve() (ParametricCurve, ParametricCurve) {
 	return seg.Subdivide()
 }
 
-func (seg PathSegment) Arclen(accuracy float64) float64 {
+func (seg PathSegment) PathLength(accuracy float64) float64 {
 	switch seg.Kind {
 	case LineKind:
-		return seg.Line().Arclen(accuracy)
+		return seg.Line().PathLength(accuracy)
 	case QuadKind:
-		return seg.Quad().Arclen(accuracy)
+		return seg.Quad().PathLength(accuracy)
 	case CubicKind:
-		return seg.Cubic().Arclen(accuracy)
+		return seg.Cubic().PathLength(accuracy)
 	default:
 		return 0
 	}
 }
 
-func (seg PathSegment) SolveForArclen(arclen, accuracy float64) float64 {
+func (seg PathSegment) SolveForPathLength(arclen, accuracy float64) float64 {
 	switch seg.Kind {
 	case LineKind:
-		return SolveForArclen(seg.Line(), arclen, accuracy)
+		return SolveForPathLength(seg.Line(), arclen, accuracy)
 	case QuadKind:
-		return SolveForArclen(seg.Quad(), arclen, accuracy)
+		return SolveForPathLength(seg.Quad(), arclen, accuracy)
 	case CubicKind:
-		return SolveForArclen(seg.Cubic(), arclen, accuracy)
+		return SolveForPathLength(seg.Cubic(), arclen, accuracy)
 	default:
 		return 0
 	}
@@ -689,11 +684,7 @@ func (p BezPath) Area() float64 {
 	return SegmentsArea(p.Segments())
 }
 
-func (p BezPath) Perimeter(accuracy float64) float64 {
-	return p.Arclen(accuracy)
-}
-
-func (p BezPath) Arclen(accuracy float64) float64 {
+func (p BezPath) PathLength(accuracy float64) float64 {
 	return SegmentsPerimeter(p.Segments(), accuracy)
 }
 
@@ -1107,7 +1098,7 @@ func Flatten(seq iter.Seq[PathElement], tolerance float64) iter.Seq[PathElement]
 func SegmentsPerimeter(seq iter.Seq[PathSegment], accuracy float64) float64 {
 	var sum float64
 	for s := range seq {
-		sum += s.Arclen(accuracy)
+		sum += s.PathLength(accuracy)
 	}
 	return sum
 }

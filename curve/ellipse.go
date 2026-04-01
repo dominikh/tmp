@@ -154,14 +154,14 @@ func (e Ellipse) PathElements(tolerance float64) iter.Seq[PathElement] {
 	}.PathElements(tolerance)
 }
 
-// Perimeter returns the approximated ellipse perimeter.
+// PathLength returns the approximated ellipse perimeter.
 //
 // This uses a numerical approximation. The absolute error between the calculated perimeter
 // and the true perimeter is bounded by `accuracy` (modulo floating point rounding errors).
 //
 // For circular ellipses (equal horizontal and vertical radii), the calculated perimeter is
 // exact.
-func (e Ellipse) Perimeter(accuracy float64) float64 {
+func (e Ellipse) PathLength(accuracy float64) float64 {
 	radii := e.Radii()
 
 	if radii.IsInf() {

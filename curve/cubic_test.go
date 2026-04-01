@@ -397,7 +397,7 @@ func TestCubicBezArclen(t *testing.T) {
 	trueArclen := 0.5*math.Sqrt(5.0) + 0.25*math.Log(2.0+math.Sqrt(5.0))
 	for i := range 12 {
 		accuracy := math.Pow(0.1, float64(i))
-		diff(t, trueArclen, c.Arclen(accuracy), cmpopts.EquateApprox(0, accuracy))
+		diff(t, trueArclen, c.PathLength(accuracy), cmpopts.EquateApprox(0, accuracy))
 	}
 }
 
@@ -415,16 +415,16 @@ func TestCubicBezInvArclen(t *testing.T) {
 		n := 10
 		for j := range n + 1 {
 			arc := float64(j) * (1.0 / float64(n) * trueArclen)
-			tt := SolveForArclen(c, arc, accuracy*0.5)
-			actualArc := c.Subsegment(0.0, tt).Arclen(accuracy * 0.5)
+			tt := SolveForPathLength(c, arc, accuracy*0.5)
+			actualArc := c.Subsegment(0.0, tt).PathLength(accuracy * 0.5)
 			diff(t, arc, actualArc, cmpopts.EquateApprox(0, accuracy))
 		}
 	}
 	// corner case: user passes accuracy larger than total arc length
 	accuracy := trueArclen * 1.1
 	arc := trueArclen * 0.5
-	tt := SolveForArclen(c, arc, accuracy)
-	actualArc := c.Subsegment(0.0, tt).Arclen(accuracy)
+	tt := SolveForPathLength(c, arc, accuracy)
+	actualArc := c.Subsegment(0.0, tt).PathLength(accuracy)
 	diff(t, arc, actualArc, cmpopts.EquateApprox(0, 2*accuracy))
 }
 
@@ -435,10 +435,10 @@ func TestCubicBezInvArclenAccuracy(t *testing.T) {
 		Pt(0.85, 1.08),
 		Pt(1.0, 0.73),
 	}
-	trueT := SolveForArclen(c, 0.5, 1e-12)
+	trueT := SolveForPathLength(c, 0.5, 1e-12)
 	for i := 1; i < 12; i++ {
 		accuracy := math.Pow(0.1, float64(i))
-		approxT := SolveForArclen(c, 0.5, accuracy)
+		approxT := SolveForPathLength(c, 0.5, accuracy)
 		diff(t, trueT, approxT, cmpopts.EquateApprox(0, accuracy))
 	}
 }

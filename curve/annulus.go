@@ -87,7 +87,7 @@ func (an Annulus) BoundingBox() Rect {
 	}
 }
 
-func (an Annulus) Perimeter(accuracy float64) float64 {
+func (an Annulus) PathLength(accuracy float64) float64 {
 	return 2 * math.Pi * (an.OuterRadius + an.InnerRadius)
 }
 
@@ -253,7 +253,7 @@ func (as AnnulusSector) BoundingBox() Rect {
 	}
 }
 
-func (as AnnulusSector) Perimeter(accuracy float64) float64 {
+func (as AnnulusSector) PathLength(accuracy float64) float64 {
 	return 2.0*
 		(as.OuterRadius-as.InnerRadius) +
 		clampAngle(as.SweepAngle)*(as.InnerRadius+as.OuterRadius)

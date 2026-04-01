@@ -17,11 +17,11 @@ func TestLineArclen(t *testing.T) {
 	l := Line{Pt(0.0, 0.0), Pt(1.0, 1.0)}
 	want := math.Sqrt(2.0)
 	epsilon := 1e-9
-	if d := l.Arclen(epsilon) - want; d > epsilon {
+	if d := l.PathLength(epsilon) - want; d > epsilon {
 		t.Errorf("%g > %g", d, epsilon)
 	}
 
-	ts := l.SolveForArclen(want/3.0, epsilon)
+	ts := l.SolveForPathLength(want/3.0, epsilon)
 	if d := math.Abs(ts - 1.0/3.0); d > epsilon {
 		t.Errorf("%g > %g", d, epsilon)
 	}

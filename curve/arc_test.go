@@ -219,7 +219,7 @@ func TestArcPerimeterCircularArc(t *testing.T) {
 		XRotation:  math.Pi / 3,
 	}
 
-	got := arc.Perimeter(1e-12)
+	got := arc.PathLength(1e-12)
 	want := 3 * math.Pi / 2
 	if math.Abs(got-want) > 1e-12 {
 		t.Fatalf("Perimeter() = %g, want %g", got, want)
@@ -235,8 +235,8 @@ func TestArcPerimeterFullArcMatchesEllipse(t *testing.T) {
 		XRotation:  math.Pi / 4,
 	}
 
-	got := arc.Perimeter(1e-12)
-	want := NewEllipse(arc.Center, arc.Radii, arc.XRotation).Perimeter(1e-12)
+	got := arc.PathLength(1e-12)
+	want := NewEllipse(arc.Center, arc.Radii, arc.XRotation).PathLength(1e-12)
 	if math.Abs(got-want) > 1e-12 {
 		t.Fatalf("Perimeter() = %g, want %g", got, want)
 	}
@@ -251,9 +251,9 @@ func TestArcPerimeterSubsegmentsAddUp(t *testing.T) {
 		XRotation:  math.Pi / 4,
 	}
 
-	whole := arc.Perimeter(1e-10)
-	left := arc.Subsegment(0, 0.4).Perimeter(5e-11)
-	right := arc.Subsegment(0.4, 1).Perimeter(5e-11)
+	whole := arc.PathLength(1e-10)
+	left := arc.Subsegment(0, 0.4).PathLength(5e-11)
+	right := arc.Subsegment(0.4, 1).PathLength(5e-11)
 	if math.Abs(whole-(left+right)) > 1e-10 {
 		t.Fatalf("Perimeter() = %g, subsegments sum to %g", whole, left+right)
 	}
@@ -268,8 +268,8 @@ func TestArcPerimeterMatchesBezierApproximation(t *testing.T) {
 		XRotation:  math.Pi / 7,
 	}
 
-	got := arc.Perimeter(1e-12)
-	approx := arc.Path(1e-11).Arclen(1e-12)
+	got := arc.PathLength(1e-12)
+	approx := arc.Path(1e-11).PathLength(1e-12)
 	if math.Abs(got-approx) > 2e-11 {
 		t.Fatalf("Perimeter() = %g, bezier approximation = %g", got, approx)
 	}

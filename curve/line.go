@@ -22,19 +22,9 @@ type Line struct {
 
 var _ Shape = Line{}
 var _ ParametricCurve = Line{}
-var _ ArclenSolver = Line{}
+var _ PathLengthSolver = Line{}
 
-// Length returns the length of the line.
-func (l Line) Length() float64 {
-	return l.P1.Sub(l.P0).Hypot()
-}
-
-// Arclen returns the length of the line
-func (l Line) Arclen(accuracy float64) float64 {
-	return l.Length()
-}
-
-func (l Line) SolveForArclen(arclen float64, accuracy float64) float64 {
+func (l Line) SolveForPathLength(arclen float64, accuracy float64) float64 {
 	return arclen / l.P1.Sub(l.P0).Hypot()
 }
 
@@ -75,8 +65,9 @@ func (l Line) BoundingBox() Rect {
 	}
 }
 
-func (l Line) Perimeter(accuracy float64) float64 {
-	return l.Length()
+// Periemter returns the length of the line.
+func (l Line) PathLength(accuracy float64) float64 {
+	return l.P1.Sub(l.P0).Hypot()
 }
 
 func (l Line) Path(tolerance float64) BezPath { return slices.Collect(l.PathElements(tolerance)) }

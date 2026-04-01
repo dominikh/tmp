@@ -50,15 +50,10 @@ func (c CubicBez) PathElements(tolerance float64) iter.Seq[PathElement] {
 	}
 }
 
-// Perimeter implements [Shape].
-func (c CubicBez) Perimeter(accuracy float64) float64 {
-	return c.Arclen(accuracy)
-}
-
-// Arclen returns the arclength of a cubic Bézier segment.
+// PathLength returns the arc length of a cubic Bézier segment.
 //
-// This is an adaptive subdivision approach using Legendre-Gauss quadrature
-func (c CubicBez) Arclen(accuracy float64) float64 {
+// This is an adaptive subdivision approach using Legendre-Gauss quadrature.
+func (c CubicBez) PathLength(accuracy float64) float64 {
 	return c.arclen(accuracy, 0)
 }
 

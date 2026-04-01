@@ -117,7 +117,7 @@ func (c Circle) BoundingBox() Rect {
 	}
 }
 
-func (c Circle) Perimeter(accuracy float64) float64 {
+func (c Circle) PathLength(accuracy float64) float64 {
 	return math.Abs(2 * math.Pi * c.Radius)
 }
 
@@ -242,7 +242,7 @@ func (cs CircleSector) BoundingBox() Rect {
 	return bbox
 }
 
-func (cs CircleSector) Perimeter(accuracy float64) float64 {
+func (cs CircleSector) PathLength(accuracy float64) float64 {
 	return 2.0*cs.Radius + clampAngle(cs.SweepAngle)*cs.Radius
 }
 

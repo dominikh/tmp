@@ -13,9 +13,9 @@ import (
 	"honnef.co/go/stuff/container/maybe"
 )
 
-// SplitArclen subdivides each subpath into segments of arc length l. Each group
+// SplitPathLength subdivides each subpath into segments of arc length l. Each group
 // of segments is delimited by a zero value path segment.
-func SplitArclen(inner iter.Seq[PathSegment], l float64) iter.Seq[PathSegment] {
+func SplitPathLength(inner iter.Seq[PathSegment], l float64) iter.Seq[PathSegment] {
 	return splitArclenMaxGroups(inner, l, -1)
 }
 
@@ -31,7 +31,7 @@ func SplitN(inner iter.Seq[PathSegment], n int) iter.Seq[PathSegment] {
 	const splitAccuracy = 1e-6
 	totalLength := 0.0
 	for seg := range inner {
-		totalLength += seg.Arclen(splitAccuracy)
+		totalLength += seg.PathLength(splitAccuracy)
 	}
 
 	splitLength := totalLength / float64(n)
@@ -81,7 +81,7 @@ func splitArclenMaxGroups(inner iter.Seq[PathSegment], l float64, n int) iter.Se
 			}
 
 			for {
-				if a := seg.Arclen(splitAccuracy); a < remainingLength {
+				if a := seg.PathLength(splitAccuracy); a < remainingLength {
 					remainingLength -= a
 					if !yield(seg) {
 						return
@@ -92,7 +92,7 @@ func splitArclenMaxGroups(inner iter.Seq[PathSegment], l float64, n int) iter.Se
 					if remainingSegs == 1 {
 						t = 1
 					} else {
-						t = SolveForArclen(seg, remainingLength, splitAccuracy)
+						t = SolveForPathLength(seg, remainingLength, splitAccuracy)
 					}
 					out = append(out, seg.Subsegment(0, t))
 					if !yield(seg.Subsegment(0, t)) {

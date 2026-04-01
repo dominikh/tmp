@@ -29,14 +29,14 @@ func TestSolveForArclen(t *testing.T) {
 	}
 	const target = 100.0
 	SolveITP(
-		func(t float64) float64 { return c.Subsegment(0.0, t).Arclen(1e-9) - target },
+		func(t float64) float64 { return c.Subsegment(0.0, t).PathLength(1e-9) - target },
 		0.0,
 		1.0,
 		1e-6,
 		1,
 		0.2,
 		-target,
-		c.Arclen(1e-9)-target,
+		c.PathLength(1e-9)-target,
 	)
 }
 

@@ -61,8 +61,8 @@
 // interpolation between its start and end points. More complex curves are the
 // quadratic and cubic Béziers, for example.
 //
-// [Arclener] is an optional interface implemented by curves that can compute
-// their length. [ArclenSolver] is an optional interface
+// [PathLengther] is an optional interface implemented by curves that can compute
+// their length. [PathLengthSolver] is an optional interface
 // implemented by curves that can efficiently solve for t given an arc length.
 //
 // [FittableCurve] is closely related to [ParametricCurve] and describes

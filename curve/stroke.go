@@ -663,24 +663,24 @@ func (di *dashIterator) getInput() {
 			continue
 		case LineToKind:
 			l := Line{p0, nextEl.P0}
-			di.segRemaining = l.Arclen(dashAccuracy)
+			di.segRemaining = l.PathLength(dashAccuracy)
 			di.currentSeg = l.Seg()
 			di.lastPt = nextEl.P0
 		case QuadToKind:
 			q := QuadBez{p0, nextEl.P0, nextEl.P1}
-			di.segRemaining = q.Arclen(dashAccuracy)
+			di.segRemaining = q.PathLength(dashAccuracy)
 			di.currentSeg = q.Seg()
 			di.lastPt = nextEl.P1
 		case CubicToKind:
 			c := CubicBez{p0, nextEl.P0, nextEl.P1, nextEl.P2}
-			di.segRemaining = c.Arclen(dashAccuracy)
+			di.segRemaining = c.PathLength(dashAccuracy)
 			di.currentSeg = c.Seg()
 			di.lastPt = nextEl.P2
 		case ClosePathKind:
 			di.closepathPending = true
 			if p0 != di.startPt {
 				l := Line{p0, di.startPt}
-				di.segRemaining = l.Arclen(dashAccuracy)
+				di.segRemaining = l.PathLength(dashAccuracy)
 				di.currentSeg = l.Seg()
 				di.lastPt = di.startPt
 			} else {
@@ -706,7 +706,7 @@ func (di *dashIterator) step() (PathElement, bool) {
 	} else if di.dashRemaining < di.segRemaining {
 		// next transition is a dash transition
 		seg := di.currentSeg.Subsegment(di.t, 1.0)
-		t1 := SolveForArclen(seg, di.dashRemaining, dashAccuracy)
+		t1 := SolveForPathLength(seg, di.dashRemaining, dashAccuracy)
 		if di.isActive {
 			subseg := seg.Subsegment(0.0, t1)
 			result = subseg.PathElement()

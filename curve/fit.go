@@ -766,12 +766,12 @@ func (cd *curveDist) computeArcParams(source FittableCurve) {
 func (cd *curveDist) evalArc(c CubicBez, acc2 float64) (float64, bool) {
 	// TODO: this could perhaps be tuned.
 	const epsilon = 1e-9
-	cArclen := c.Arclen(epsilon)
+	cArclen := c.PathLength(epsilon)
 	maxErr2 := 0.0
 	for i := range cd.samples {
 		sample := cd.samples[i]
 		s := cd.arcparams[i]
-		t := SolveForArclen(c, cArclen*s, epsilon)
+		t := SolveForPathLength(c, cArclen*s, epsilon)
 		err := sample.Point.DistanceSquared(c.Eval(t))
 		maxErr2 = max(err, maxErr2)
 		if maxErr2 > acc2 {

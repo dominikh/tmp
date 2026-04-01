@@ -119,9 +119,9 @@ type ClosedShape interface {
 }
 
 type Shape interface {
-	// Perimeter returns the length of a shape's perimeter. For open shapes,
-	// such as arcs, the perimeter is really the arc length.
-	Perimeter(accuracy float64) float64
+	// PathLength returns the length of a shape's path. For open shapes, this is
+	// the arc length. For closed shapes this is the perimeter.
+	PathLength(accuracy float64) float64
 
 	// BoundingBox returns the smallest rectangle that encloses the shape.
 	BoundingBox() Rect
@@ -157,15 +157,15 @@ type ParametricCurve interface {
 	End() Point
 }
 
-// Arclener describes a parametrized curve that can have its arc length
+// PathLengther describes a parametrized curve that can have its arc length
 // measured.
-type Arclener interface {
-	// Arclen returns the length of the curve.
+type PathLengther interface {
+	// PathLength returns the length of the curve.
 	//
 	// The result is accurate to the given accuracy (subject to roundoff errors
 	// for ridiculously low values). Compute time may vary with accuracy, if the
 	// curve needs to be subdivided.
-	Arclen(accuracy float64) float64
+	PathLength(accuracy float64) float64
 }
 
 // expand rounds f away from zero.
@@ -770,13 +770,13 @@ func relativeEpsilon(raw float64, a float64) float64 {
 	}
 }
 
-// ArclenSolver can be implemented by types that have a better way of computing
-// the solution than the one used by [SolveForArclen].
-type ArclenSolver interface {
-	SolveForArclen(arclen float64, accuracy float64) float64
+// PathLengthSolver can be implemented by types that have a better way of computing
+// the solution than the one used by [SolveForPathLength].
+type PathLengthSolver interface {
+	SolveForPathLength(arclen float64, accuracy float64) float64
 }
 
-// SolveForArclen solves for the parameter that has the given arc length from
+// SolveForPathLength solves for the parameter that has the given arc length from
 // the start of the curve.
 //
 // This implementation uses the [IPT method], as provided by [SolveITP]. This is
@@ -785,22 +785,22 @@ type ArclenSolver interface {
 // the curve, as that is likely faster than repeatedly computing the arc length
 // of the segment starting at t=0.
 //
-// Types can optionally implement [ArclenSolver], in which case this function
+// Types can optionally implement [PathLengthSolver], in which case this function
 // will defer to it.
 //
 // [ITP method]: https://en.wikipedia.org/wiki/ITP_Method
-func SolveForArclen(curve interface {
+func SolveForPathLength(curve interface {
 	ParametricCurve
-	Arclener
+	PathLengther
 }, arclen float64, accuracy float64) float64 {
-	if curve, ok := curve.(ArclenSolver); ok {
-		return curve.SolveForArclen(arclen, accuracy)
+	if curve, ok := curve.(PathLengthSolver); ok {
+		return curve.SolveForPathLength(arclen, accuracy)
 	}
 
 	if arclen <= 0.0 {
 		return 0.0
 	}
-	totalArclen := curve.Arclen(accuracy)
+	totalArclen := curve.PathLength(accuracy)
 	if arclen >= totalArclen {
 		return 1.0
 	}
@@ -820,7 +820,7 @@ func SolveForArclen(curve interface {
 			rangeEnd = tLast
 			dir = -1.0
 		}
-		arc := curve.SubsegmentCurve(rangeStart, rangeEnd).(Arclener).Arclen(innerAccuracy)
+		arc := curve.SubsegmentCurve(rangeStart, rangeEnd).(PathLengther).PathLength(innerAccuracy)
 		arclenLast += arc * dir
 		tLast = t
 		return arclenLast - arclen
