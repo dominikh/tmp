@@ -220,12 +220,12 @@ func (cs CircleSector) Area() float64 {
 }
 
 func (cs CircleSector) BoundingBox() Rect {
-	sweep := clampAngle(cs.SweepAngle)
+	sweepAngle := clampAngle(cs.SweepAngle)
 	containsAngle := func(a Angle) bool {
-		if sweep >= 0 {
-			return normalizeAngle(a-cs.StartAngle) <= sweep
+		if sweepAngle >= 0 {
+			return normalizeAngle(a-cs.StartAngle) <= sweepAngle
 		}
-		return normalizeAngle(cs.StartAngle-a) <= -sweep
+		return normalizeAngle(cs.StartAngle-a) <= -sweepAngle
 	}
 
 	bbox := Rect{1, 1, 0, 0}.

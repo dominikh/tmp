@@ -31,13 +31,14 @@ func (a Arc) PathElements(tolerance float64) iter.Seq[PathElement] {
 			return
 		}
 
+		sweepAngle := clampAngle(a.SweepAngle)
 		scaledError := max(a.Radii.X, a.Radii.Y) / tolerance
 		// Number of subdivisions per ellipse based on error tolerance.
 		// Note: this may slightly underestimate the error for quadrants.
 		nError := max(math.Pow(1.1163*scaledError, 1.0/6.0), 3.999_999)
-		n := math.Ceil(nError * math.Abs(clampAngle(a.SweepAngle)) * (1.0 / (2.0 * math.Pi)))
-		angleStep := clampAngle(a.SweepAngle) / n
-		armLen := math.Copysign((4.0/3.0)*math.Tan(math.Abs(0.25*angleStep)), clampAngle(a.SweepAngle))
+		n := math.Ceil(nError * math.Abs(sweepAngle) * (1.0 / (2.0 * math.Pi)))
+		angleStep := sweepAngle / n
+		armLen := math.Copysign((4.0/3.0)*math.Tan(math.Abs(0.25*angleStep)), sweepAngle)
 		angle0 := normalizeAngle(a.StartAngle)
 		p0 := sampleEllipse(a.Radii, a.XRotation, angle0)
 
@@ -82,27 +83,26 @@ func rotatePt(pt Vec2, angle Angle) Vec2 {
 func (a Arc) BoundingBox() Rect {
 	bbox := NewRectFromPoints(a.Start(), a.End())
 
-	start := normalizeAngle(a.StartAngle)
-	sweep := clampAngle(a.SweepAngle)
-	if math.Abs(sweep) == 2*math.Pi {
+	startAngle := normalizeAngle(a.StartAngle)
+	sweepAngle := clampAngle(a.SweepAngle)
+	if math.Abs(sweepAngle) == 2*math.Pi {
 		return NewEllipse(a.Center, a.Radii, a.XRotation).BoundingBox()
 	}
 
 	containsAngle := func(angle Angle) bool {
-		angle = normalizeAngle(angle)
-		if sweep >= 0 {
-			end := start + sweep
+		if sweepAngle >= 0 {
+			end := startAngle + sweepAngle
 			if end <= 2*math.Pi {
-				return angle >= start && angle <= end
+				return angle >= startAngle && angle <= end
 			}
-			return angle >= start || angle <= normalizeAngle(end)
+			return angle >= startAngle || angle <= normalizeAngle(end)
 		}
 
-		end := start + sweep
+		end := startAngle + sweepAngle
 		if end >= 0 {
-			return angle <= start && angle >= end
+			return angle <= startAngle && angle >= end
 		}
-		return angle <= start || angle >= normalizeAngle(end)
+		return angle <= startAngle || angle >= normalizeAngle(end)
 	}
 
 	// These are the angles where the rotated ellipse reaches an extremum
@@ -132,12 +132,12 @@ func (a Arc) Perimeter(accuracy float64) float64 {
 	}
 
 	radii := Vec(math.Abs(a.Radii.X), math.Abs(a.Radii.Y))
-	sweep := math.Abs(clampAngle(a.SweepAngle))
+	sweepAngle := math.Abs(clampAngle(a.SweepAngle))
 
 	if radii.X == radii.Y {
-		return radii.X * sweep
+		return radii.X * sweepAngle
 	}
-	if sweep == 2*math.Pi {
+	if sweepAngle == 2*math.Pi {
 		return NewEllipse(a.Center, radii, a.XRotation).Perimeter(accuracy)
 	}
 
@@ -145,7 +145,7 @@ func (a Arc) Perimeter(accuracy float64) float64 {
 		sin, cos := math.Sincos(theta)
 		return math.Hypot(radii.X*sin, radii.Y*cos)
 	}
-	start := normalizeAngle(a.StartAngle)
+	startAngle := normalizeAngle(a.StartAngle)
 	dir := math.Copysign(1, a.SweepAngle)
 	var integrate func(start, end Angle, accuracy float64, depth int) float64
 	integrateInterval := func(sweepStart, sweepEnd Angle, coeffs [][2]float64) float64 {
@@ -153,7 +153,7 @@ func (a Arc) Perimeter(accuracy float64) float64 {
 		halfRange := 0.5 * (sweepEnd - sweepStart)
 		sum := 0.0
 		for _, coeff := range coeffs {
-			sum += coeff[0] * integrand(start+dir*(mid+halfRange*coeff[1]))
+			sum += coeff[0] * integrand(startAngle+dir*(mid+halfRange*coeff[1]))
 		}
 		return sum * halfRange
 	}
@@ -167,7 +167,7 @@ func (a Arc) Perimeter(accuracy float64) float64 {
 		return integrate(sweepStart, mid, accuracy*0.5, depth+1) + integrate(mid, sweepEnd, accuracy*0.5, depth+1)
 	}
 
-	return integrate(0, sweep, accuracy, 0)
+	return integrate(0, sweepAngle, accuracy, 0)
 }
 
 func (a Arc) Translate(v Vec2) Arc {
@@ -179,11 +179,12 @@ func (a Arc) Translate(v Vec2) Arc {
 //
 // The new arc will sweep towards the original arc's start angle.
 func (a Arc) Reverse() Arc {
+	sweepAngle := clampAngle(a.SweepAngle)
 	return Arc{
 		Center:     a.Center,
 		Radii:      a.Radii,
-		StartAngle: normalizeAngle(a.StartAngle + clampAngle(a.SweepAngle)),
-		SweepAngle: -clampAngle(a.SweepAngle),
+		StartAngle: normalizeAngle(a.StartAngle + sweepAngle),
+		SweepAngle: -sweepAngle,
 		XRotation:  a.XRotation,
 	}
 }

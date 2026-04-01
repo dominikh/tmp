@@ -150,11 +150,12 @@ func (as AnnulusSector) OuterArc() Arc {
 // annulus sector produce a closed path). See [Arc.Reverse] for reversing the
 // arc.
 func (as AnnulusSector) InnerArc() Arc {
+	sweepAngle := clampAngle(as.SweepAngle)
 	return Arc{
 		Center:     as.Center,
 		Radii:      Vec2{as.InnerRadius, as.InnerRadius},
-		StartAngle: normalizeAngle(as.StartAngle + clampAngle(as.SweepAngle)),
-		SweepAngle: -clampAngle(as.SweepAngle),
+		StartAngle: normalizeAngle(as.StartAngle + sweepAngle),
+		SweepAngle: -sweepAngle,
 		XRotation:  0.0,
 	}
 }
