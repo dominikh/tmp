@@ -124,7 +124,50 @@ func (a Arc) BoundingBox() Rect {
 }
 
 func (a Arc) Perimeter(accuracy float64) float64 {
-	panic("not implemented")
+	if a.SweepAngle == 0 {
+		return 0
+	}
+	if a.Radii.IsInf() {
+		return math.Inf(1)
+	}
+
+	radii := Vec(math.Abs(a.Radii.X), math.Abs(a.Radii.Y))
+	sweep := math.Abs(clampAngle(a.SweepAngle))
+
+	if radii.X == radii.Y {
+		return radii.X * sweep
+	}
+	if sweep == 2*math.Pi {
+		return NewEllipse(a.Center, radii, a.XRotation).Perimeter(accuracy)
+	}
+
+	integrand := func(theta Angle) float64 {
+		sin, cos := math.Sincos(theta)
+		return math.Hypot(radii.X*sin, radii.Y*cos)
+	}
+	start := normalizeAngle(a.StartAngle)
+	dir := math.Copysign(1, a.SweepAngle)
+	var integrate func(start, end Angle, accuracy float64, depth int) float64
+	integrateInterval := func(sweepStart, sweepEnd Angle, coeffs [][2]float64) float64 {
+		mid := 0.5 * (sweepStart + sweepEnd)
+		halfRange := 0.5 * (sweepEnd - sweepStart)
+		sum := 0.0
+		for _, coeff := range coeffs {
+			sum += coeff[0] * integrand(start+dir*(mid+halfRange*coeff[1]))
+		}
+		return sum * halfRange
+	}
+	integrate = func(sweepStart, sweepEnd Angle, accuracy float64, depth int) float64 {
+		i8 := integrateInterval(sweepStart, sweepEnd, gaussLegendreCoeffs8[:])
+		i16 := integrateInterval(sweepStart, sweepEnd, gaussLegendreCoeffs16[:])
+		if math.Abs(i16-i8) <= accuracy || depth >= 20 {
+			return i16
+		}
+		mid := 0.5 * (sweepStart + sweepEnd)
+		return integrate(sweepStart, mid, accuracy*0.5, depth+1) + integrate(mid, sweepEnd, accuracy*0.5, depth+1)
+	}
+
+	return integrate(0, sweep, accuracy, 0)
 }
 
 func (a Arc) Translate(v Vec2) Arc {
