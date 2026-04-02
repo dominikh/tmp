@@ -11,7 +11,6 @@ require (
 	github.com/mmcloughlin/avo v0.6.0
 	golang.org/x/exp v0.0.0-20240613232115-7f521ea00fb8
 	golang.org/x/sys v0.31.0
-	honnef.co/go/safeish v0.0.0-20241114181457-67c0a2c357ad
 )
 
 require (

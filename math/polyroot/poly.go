@@ -10,8 +10,8 @@ import (
 	"slices"
 	"strconv"
 
-	"honnef.co/go/safeish"
 	"honnef.co/go/stuff/math/polyroot/quadratics"
+	"honnef.co/go/stuff/safeish"
 )
 
 type Polynomial struct {
