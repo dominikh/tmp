@@ -30,7 +30,7 @@ func TestNvec(t *testing.T) {
 		t.Errorf("n.get(1)=%d, want 1", w)
 	}
 
-	for i := 0; i < 14; i++ {
+	for range 14 {
 		n.inc(1)
 	}
 	if n[0] != 0xf1 {
@@ -44,7 +44,7 @@ func TestNvec(t *testing.T) {
 	}
 
 	// ensure clamped
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		n.inc(1)
 		if n[0] != 0xf1 {
 			t.Errorf("n[0]=0x%02x, want 0xf1: (n=% 02x)", n[0], n)

@@ -9,6 +9,7 @@ import (
 	"math"
 	"slices"
 	"strconv"
+	"strings"
 
 	"honnef.co/go/stuff/math/polyroot/quadratics"
 	"honnef.co/go/stuff/safeish"
@@ -33,7 +34,7 @@ func (poly *Polynomial) String() string {
 
 	// supers := []rune("⁰¹²³⁴⁵⁶⁷⁸⁹")
 
-	var out string
+	var out strings.Builder
 	for i := len(poly.coeffs) - 1; i >= 0; i-- {
 		coeff := poly.coeffs[i]
 		if coeff == 0 {
@@ -41,9 +42,9 @@ func (poly *Polynomial) String() string {
 		}
 		if i == 0 {
 			if coeff > 0 {
-				out += fmt.Sprintf("+ %g", coeff)
+				fmt.Fprintf(&out, "+ %g", coeff)
 			} else if coeff < 0 {
-				out += fmt.Sprintf("- %g", math.Abs(coeff))
+				fmt.Fprintf(&out, "- %g", math.Abs(coeff))
 			}
 		} else {
 			power := "^"
@@ -58,27 +59,27 @@ func (poly *Polynomial) String() string {
 			switch coeff {
 			case 0:
 			case -1:
-				out += fmt.Sprintf("- x%s ", power)
+				fmt.Fprintf(&out, "- x%s ", power)
 			case 1:
 				if i == len(poly.coeffs)-1 {
-					out += fmt.Sprintf("x%s ", power)
+					fmt.Fprintf(&out, "x%s ", power)
 				} else {
-					out += fmt.Sprintf("+ x%s ", power)
+					fmt.Fprintf(&out, "+ x%s ", power)
 				}
 			default:
 				if i == len(poly.coeffs)-1 {
-					out += fmt.Sprintf("%g*x%s ", coeff, power)
+					fmt.Fprintf(&out, "%g*x%s ", coeff, power)
 				} else {
 					ourSign := "+"
 					if coeff < 0 {
 						ourSign = "-"
 					}
-					out += fmt.Sprintf("%s %g*x%s ", ourSign, math.Abs(coeff), power)
+					fmt.Fprintf(&out, "%s %g*x%s ", ourSign, math.Abs(coeff), power)
 				}
 			}
 		}
 	}
-	return out
+	return out.String()
 }
 
 // NewPolynomial constructs a new polynomial from coefficients.
