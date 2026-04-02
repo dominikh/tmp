@@ -1,0 +1,209 @@
+// SPDX-FileCopyrightText: 2018 Raph Levien
+// SPDX-FileCopyrightText: 2024 Dominik Honnef and contributors
+//
+// SPDX-License-Identifier: MIT
+// SPDX-FileAttributionText: https://github.com/linebender/kurbo
+
+package curve
+
+import (
+	"math"
+	"testing"
+
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
+)
+
+func assertNear(t *testing.T, p0 Point, p1 Point, epsilon float64) {
+	t.Helper()
+	if d := p1.Sub(p0).Hypot(); d > epsilon {
+		t.Fatalf("got %s, expected %s", p0, p1)
+	}
+}
+
+func TestAffineBasic(t *testing.T) {
+	const epsilon = 1e-9
+	p := Pt(3, 4)
+
+	assertNear(t, p.Transform(Identity), p, epsilon)
+	assertNear(t, p.Transform(Scale(2, 2)), Pt(6, 8), epsilon)
+	assertNear(t, p.Transform(Rotate(0)), p, epsilon)
+	assertNear(t, p.Transform(Rotate(math.Pi/2)), Pt(-4, 3), epsilon)
+	assertNear(t, p.Transform(Translate(Vec(5, 6))), Pt(8, 10), epsilon)
+	assertNear(t, p.Transform(Skew(0, 0)), p, epsilon)
+	assertNear(t, p.Transform(Skew(2, 4)), Pt(11, 16), epsilon)
+}
+
+func TestAffineMul(t *testing.T) {
+	const epsilon = 1e-9
+	a1 := Affine{1, 2, 3, 4, 5, 6}
+	a2 := Affine{0.1, 1.2, 2.3, 3.4, 4.5, 5.6}
+
+	px := Pt(1, 0)
+	py := Pt(0, 1)
+	pxy := Pt(1, 1)
+
+	assertNear(t, px.Transform(a2).Transform(a1), px.Transform(a1.Mul(a2)), epsilon)
+	assertNear(t, py.Transform(a2).Transform(a1), py.Transform(a1.Mul(a2)), epsilon)
+	assertNear(t, pxy.Transform(a2).Transform(a1), pxy.Transform(a1.Mul(a2)), epsilon)
+}
+
+func TestAffineInvert(t *testing.T) {
+	const epsilon = 1e-9
+	a := Affine{0.1, 1.2, 2.3, 3.4, 4.5, 5.6}
+	aInv := a.Invert()
+
+	px := Pt(1, 0)
+	py := Pt(0, 1)
+	pxy := Pt(1, 1)
+
+	assertNear(t, px.Transform(aInv).Transform(a), px, epsilon)
+	assertNear(t, py.Transform(aInv).Transform(a), py, epsilon)
+	assertNear(t, pxy.Transform(aInv).Transform(a), pxy, epsilon)
+	assertNear(t, px.Transform(a).Transform(aInv), px, epsilon)
+	assertNear(t, py.Transform(a).Transform(aInv), py, epsilon)
+	assertNear(t, pxy.Transform(a).Transform(aInv), pxy, epsilon)
+}
+
+func TestReflection(t *testing.T) {
+	affineAssertNear := func(a0, a1 Affine) {
+		a0a := a0.Coefficients()
+		a1a := a1.Coefficients()
+		for i := range 6 {
+			if d := math.Abs(a0a[i] - a1a[i]); d > 1e-9 {
+				t.Fatalf("%g > %g", d, 1e-9)
+			}
+		}
+	}
+
+	affineAssertNear(Reflect(Point{}, Vec(1, 0)), Affine{1, 0, 0, -1, 0, 0})
+	affineAssertNear(Reflect(Point{}, Vec(0, 1)), Affine{-1, 0, 0, 1, 0, 0})
+	affineAssertNear(Reflect(Point{}, Vec(1, 1)), Affine{0, 1, 1, 0, 0, 0})
+
+	const epsilon = 1e-9
+	{
+		// No translation
+		point := Pt(0, 0)
+		vec := Vec(1, 1)
+		aff := Reflect(point, vec)
+		assertNear(t, Pt(0, 0).Transform(aff), Pt(0, 0), epsilon)
+		assertNear(t, Pt(1, 1).Transform(aff), Pt(1, 1), epsilon)
+		assertNear(t, Pt(1, 2).Transform(aff), Pt(2, 1), epsilon)
+	}
+
+	{
+		// With translation
+		point := Pt(1, 0)
+		vec := Vec(1, 1)
+		aff := Reflect(point, vec)
+		assertNear(t, Pt(1, 0).Transform(aff), Pt(1, 0), epsilon)
+		assertNear(t, Pt(2, 1).Transform(aff), Pt(2, 1), epsilon)
+		assertNear(t, Pt(2, 2).Transform(aff), Pt(3, 1), epsilon)
+	}
+}
+
+func BenchmarkAffine_svd(b *testing.B) {
+	aff := Identity.ThenScale(3, 7).ThenRotate(1.23)
+	for b.Loop() {
+		aff.svd()
+	}
+}
+
+func BenchmarkAffine_svd0(b *testing.B) {
+	aff := Identity.ThenScale(3, 7).ThenRotate(1.23)
+	for b.Loop() {
+		aff.svd0()
+	}
+}
+
+func BenchmarkAffine_svd1(b *testing.B) {
+	aff := Identity.ThenScale(3, 7).ThenRotate(1.23)
+	for b.Loop() {
+		aff.svd1()
+	}
+}
+
+func TestAffine_svd(t *testing.T) {
+	tests := []struct {
+		aff   Affine
+		want  Vec2
+		want2 float64
+	}{
+		{
+			Affine{1, 0, 0, 1, 0, 0},
+			Vec(1, 1),
+			0,
+		},
+		{
+			Affine{1, 0, 0, -1, 0, 0},
+			Vec(1, 1),
+			0,
+		},
+		{
+			Affine{1, 1, 1, 1, 0, 0},
+			Vec(2, 0),
+			1.5707963267948966,
+		},
+		{
+			Affine{0, 0, 1, 0, 0, 0},
+			Vec(1, 0),
+			0,
+		},
+		{
+			Scale(4, 8).
+				ThenRotateAbout(0.733038, Pt(-2, 50)),
+			Vec(8, 4),
+			-1.777989284994809,
+		},
+
+		// Correctly handles negative scaling (singular values are necessarily non-negative).
+		{
+			Scale(-20, 3),
+			Vec(20, 3),
+			0,
+		},
+		{
+			Scale(-20, -3),
+			Vec(20, 3),
+			0,
+		},
+		{
+			Scale(20, -3),
+			Vec(20, 3),
+			0,
+		},
+	}
+	for _, tt := range tests {
+		t.Run("", func(t *testing.T) {
+			got, got2 := tt.aff.svd()
+			if !cmp.Equal(got, tt.want, cmpopts.EquateApprox(0, 1e-6)) {
+				t.Errorf("svd() = %v, want %v", got, tt.want)
+			}
+			if !cmp.Equal(got2, tt.want2, cmpopts.EquateApprox(0, 1e-6)) {
+				t.Errorf("svd() = %v, want %v", got2, tt.want2)
+			}
+
+			got = tt.aff.svd0()
+			if !cmp.Equal(got, tt.want, cmpopts.EquateApprox(0, 1e-6)) {
+				t.Errorf("svd0() = %v, want %v", got, tt.want)
+			}
+
+			got2 = tt.aff.svd1()
+			if !cmp.Equal(got2, tt.want2, cmpopts.EquateApprox(0, 1e-6)) {
+				t.Errorf("svd() = %v, want %v", got2, tt.want2)
+			}
+		})
+	}
+
+	// Given a full-rank transform, the product of its singular values
+	// should be equal to its absolute determinant.
+	m := Affine{10, 9, -2.5, 10.0 / 3.0, 0, 0}
+	s, _ := m.svd()
+	prod := s.X * s.Y
+	det := math.Abs(m.Determinant())
+
+	if !cmp.Equal(prod, det, cmpopts.EquateApprox(0, 1e-6)) {
+		t.Errorf("the product of the singular values %v (%v) should be equal to the absolute determinant %v",
+			s, prod, det)
+	}
+}
