@@ -142,6 +142,20 @@ func (r Rect) Contains(pt Point) bool {
 		pt.Y < r.Y1
 }
 
+// ContainsRect reports whether r contains the rectangle o.
+//
+// Two identical rectangles contain each other.
+//
+// Non-existent rectangles can neither contain nor be contained by other
+// rectangles.
+func (r Rect) ContainsRect(o Rect) bool {
+	if !r.Exists() || !o.Exists() {
+		return false
+	}
+	return r.X0 <= o.X0 && r.Y0 <= o.Y0 &&
+		r.X1 >= o.X1 && r.Y1 >= o.Y1
+}
+
 // Overlaps reports whether r and o overlap. Two rectangles overlap if their
 // intersection is non-empty.
 func (r Rect) Overlaps(o Rect) bool {
