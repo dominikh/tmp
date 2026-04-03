@@ -788,28 +788,19 @@ func (p BezPath) IsNaN() bool {
 // Unlike [BezPath.BoundingBox], this uses control points directly rather than computing
 // tight bounds for curve elements.
 func (p BezPath) ControlBox() Rect {
-	first := true
-	var cbox Rect
-	addPt := func(pt Point) {
-		if first {
-			first = false
-			cbox = NewRectFromPoints(pt, pt)
-		} else {
-			cbox = cbox.UnionPoint(pt)
-		}
-	}
+	cbox := Rect{1, 1, 0, 0}
 	for i := range p {
 		el := p[i]
 		switch el.Kind {
 		case MoveToKind, LineToKind:
-			addPt(el.P0)
+			cbox = cbox.UnionPoint(el.P0)
 		case QuadToKind:
-			addPt(el.P0)
-			addPt(el.P1)
+			cbox = cbox.UnionPoint(el.P0)
+			cbox = cbox.UnionPoint(el.P1)
 		case CubicToKind:
-			addPt(el.P0)
-			addPt(el.P1)
-			addPt(el.P2)
+			cbox = cbox.UnionPoint(el.P0)
+			cbox = cbox.UnionPoint(el.P1)
+			cbox = cbox.UnionPoint(el.P2)
 		case ClosePathKind:
 		}
 	}
@@ -1112,16 +1103,9 @@ func SegmentsArea(seq iter.Seq[PathSegment]) float64 {
 }
 
 func SegmentsBoundingBox(seq iter.Seq[PathSegment]) Rect {
-	var bbox Rect
-	first := true
+	bbox := Rect{1, 1, 0, 0}
 	for s := range seq {
-		sbbox := BoundingBox(s)
-		if first {
-			first = false
-			bbox = sbbox
-		} else {
-			bbox = bbox.Union(sbbox)
-		}
+		bbox = bbox.Union(BoundingBox(s))
 	}
 	return bbox
 }
