@@ -9,7 +9,6 @@ package curve
 import (
 	"fmt"
 	"math"
-	"slices"
 	"testing"
 )
 
@@ -32,7 +31,7 @@ func TestEllipseAreaSign(t *testing.T) {
 		t.Errorf("got winding number %d, expected 1", w)
 	}
 
-	p := BezPath(slices.Collect(e.PathElements(1e-9)))
+	p := e.Path(1e-9, nil)
 	if ea, pa := e.Area(), p.Area(); !approxEqual(ea, pa) {
 		t.Errorf("got areas %v and %v, expected them to be the same", ea, pa)
 	}
@@ -50,7 +49,7 @@ func TestEllipseAreaSign(t *testing.T) {
 		t.Errorf("got winding number %d, expected 1", w)
 	}
 
-	pNegRadius := BezPath(slices.Collect(eNegRadius.PathElements(1e-9)))
+	pNegRadius := eNegRadius.Path(1e-9, nil)
 	if ea, pa := eNegRadius.Area(), pNegRadius.Area(); !approxEqual(ea, pa) {
 		t.Errorf("got areas %v and %v, expected them to be the same", ea, pa)
 	}

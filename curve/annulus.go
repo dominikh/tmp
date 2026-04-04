@@ -7,9 +7,7 @@
 package curve
 
 import (
-	"iter"
 	"math"
-	"slices"
 )
 
 type Annulus struct {
@@ -25,33 +23,20 @@ func (an Annulus) Contains(pt Point) bool {
 	return an.Winding(pt) != 0
 }
 
-func (an Annulus) Path(tolerance float64) BezPath {
-	return slices.Collect(an.PathElements(tolerance))
-}
+// Path implements Shape.
+func (an Annulus) Path(tolerance float64, out BezPath) BezPath {
+	out = Circle{
+		Center: an.Center,
+		Radius: an.OuterRadius,
+	}.Path(tolerance, out)
 
-// PathElements implements Shape.
-func (an Annulus) PathElements(tolerance float64) iter.Seq[PathElement] {
-	return func(yield func(PathElement) bool) {
-		for el := range (Circle{
-			Center: an.Center,
-			Radius: an.OuterRadius,
-		}).PathElements(tolerance) {
-			if !yield(el) {
-				return
-			}
-		}
+	// OPT(dh): could we reverse in-place and avoid allocating for Circle.Path?
+	out = Circle{
+		Center: an.Center,
+		Radius: an.InnerRadius,
+	}.Path(tolerance, nil).ReverseSubpaths(out)
 
-		// OPT(dh): we should implement a version of Circle.Path that emits the
-		// path in reverse order so that we don't have to allocate a slice.
-		for _, el := range (Circle{
-			Center: an.Center,
-			Radius: an.InnerRadius,
-		}).Path(tolerance).ReverseSubpaths() {
-			if !yield(el) {
-				return
-			}
-		}
-	}
+	return out
 }
 
 func (an Annulus) IsInf() bool {
@@ -128,10 +113,6 @@ func (as AnnulusSector) Contains(pt Point) bool {
 	return as.Winding(pt) != 0
 }
 
-func (as AnnulusSector) Path(tolerance float64) BezPath {
-	return slices.Collect(as.PathElements(tolerance))
-}
-
 // OuterArc returns the arc representing the outer radius.
 func (as AnnulusSector) OuterArc() Arc {
 	return Arc{
@@ -160,58 +141,28 @@ func (as AnnulusSector) InnerArc() Arc {
 	}
 }
 
-// PathElements implements Shape.
-func (as AnnulusSector) PathElements(tolerance float64) iter.Seq[PathElement] {
+// Path implements Shape.
+func (as AnnulusSector) Path(tolerance float64, out BezPath) BezPath {
 	if math.Abs(as.SweepAngle) < 2*math.Pi {
-		return func(yield func(PathElement) bool) {
-			if !yield(MoveTo(pointOnCircle(as.Center, as.InnerRadius, as.StartAngle))) {
-				return
-			}
+		out.MoveTo(pointOnCircle(as.Center, as.InnerRadius, as.StartAngle))
 
-			// First radius
-			if !yield(LineTo(pointOnCircle(as.Center, as.OuterRadius, as.StartAngle))) {
-				return
-			}
+		// First radius
+		out.LineTo(pointOnCircle(as.Center, as.OuterRadius, as.StartAngle))
 
-			// Outer arc
-			a := as.OuterArc()
-			for el := range dropFirst(a.PathElements(tolerance)) {
-				if !yield(el) {
-					return
-				}
-			}
+		// Outer arc
+		out = appendPathDropMoveTo(out, tolerance, as.OuterArc())
 
-			// Second radius
-			if !yield(LineTo(pointOnCircle(as.Center, as.InnerRadius, as.StartAngle+as.SweepAngle))) {
-				return
-			}
+		// Second radius
+		out.LineTo(pointOnCircle(as.Center, as.InnerRadius, as.StartAngle+as.SweepAngle))
 
-			// Inner arc
-			a = as.InnerArc()
-			for el := range dropFirst(a.PathElements(tolerance)) {
-				if !yield(el) {
-					return
-				}
-			}
-		}
+		// Inner arc
+		out = appendPathDropMoveTo(out, tolerance, as.InnerArc())
+
+		return out
 	} else {
-		return func(yield func(PathElement) bool) {
-			// Outer arc
-			a := as.OuterArc()
-			for el := range a.PathElements(tolerance) {
-				if !yield(el) {
-					return
-				}
-			}
-
-			// Inner arc
-			a = as.InnerArc()
-			for el := range a.PathElements(tolerance) {
-				if !yield(el) {
-					return
-				}
-			}
-		}
+		out = as.OuterArc().Path(tolerance, out)
+		out = as.InnerArc().Path(tolerance, out)
+		return out
 	}
 }
 

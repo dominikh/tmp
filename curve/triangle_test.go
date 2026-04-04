@@ -8,7 +8,6 @@ package curve
 
 import (
 	"math"
-	"slices"
 	"testing"
 )
 
@@ -37,7 +36,7 @@ func TestTriangleAreaSign(t *testing.T) {
 		t.Errorf("got winding %v, want %v", w, 1)
 	}
 
-	p := BezPath(slices.Collect(tri.PathElements(1e-9)))
+	p := tri.Path(1e-9, nil)
 	if ta, pa := tri.Area(), p.Area(); !approxEqual(ta, pa) {
 		t.Errorf("expected triangle and path areas to be approximately equal, got %v and %v", ta, pa)
 	}
@@ -53,7 +52,7 @@ func TestTriangleAreaSign(t *testing.T) {
 		t.Errorf("got winding %v, want %v", w, -1)
 	}
 
-	pFlip := BezPath(slices.Collect(triFlip.PathElements(1e-9)))
+	pFlip := triFlip.Path(1e-9, nil)
 	if ta, pa := triFlip.Area(), pFlip.Area(); !approxEqual(ta, pa) {
 		t.Errorf("expected flipped triangle and path areas to be approximately equal, got %v and %v", ta, pa)
 	}

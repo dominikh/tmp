@@ -7,9 +7,7 @@
 package curve
 
 import (
-	"iter"
 	"math"
-	"slices"
 
 	"honnef.co/go/stuff/container/maybe"
 	"honnef.co/go/stuff/math/polyroot"
@@ -28,13 +26,10 @@ func (q QuadBez) BoundingBox() Rect {
 	return BoundingBox(q)
 }
 
-func (q QuadBez) Path(tolerance float64) BezPath { return slices.Collect(q.PathElements(tolerance)) }
-
-func (q QuadBez) PathElements(tolerance float64) iter.Seq[PathElement] {
-	return func(yield func(PathElement) bool) {
-		_ = yield(MoveTo(q.P0)) &&
-			yield(QuadTo(q.P1, q.P2))
-	}
+func (q QuadBez) Path(tolerance float64, out BezPath) BezPath {
+	out.MoveTo(q.P0)
+	out.QuadTo(q.P1, q.P2)
+	return out
 }
 
 // Raise raises the order by one, returning a cubic Bézier segment that exactly

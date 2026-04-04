@@ -137,9 +137,7 @@ type Shape interface {
 	// eye. For scientific applications, a smaller value might be appropriate.
 	// Note that in general the number of cubic Bézier segments scales as
 	// 'tolerance ** (-1/6)'.
-	PathElements(tolerance float64) iter.Seq[PathElement]
-
-	Path(tolerance float64) BezPath
+	Path(tolerance float64, out BezPath) BezPath
 }
 
 // ParametricCurve describes a curve parametrized by a scalar.
@@ -193,11 +191,11 @@ func Elements(seq iter.Seq[PathSegment]) iter.Seq[PathElement] {
 }
 
 // Segments converts a sequence of path elements to a sequence of path segments.
-func Segments(seq iter.Seq[PathElement]) iter.Seq[PathSegment] {
+func (seq BezPath) Segments() iter.Seq[PathSegment] {
 	return func(yield func(PathSegment) bool) {
 		first := true
 		var start, last Point
-		for el := range seq {
+		for _, el := range seq {
 			if first {
 				first = false
 				switch el.Kind {
@@ -268,7 +266,7 @@ type SVGOptions struct {
 //
 // The current implementation doesn't take any special care to produce a
 // short string (reducing precision, using relative movement).
-func SVG(seq iter.Seq[PathElement], opts SVGOptions) string {
+func SVG(seq BezPath, opts SVGOptions) string {
 	sb := &strings.Builder{}
 	WriteSVG(sb, seq, opts)
 	return sb.String()
@@ -281,7 +279,7 @@ func SVG(seq iter.Seq[PathElement], opts SVGOptions) string {
 //
 // The current implementation doesn't take any special care to produce a
 // short string (reducing precision, using relative movement).
-func WriteSVG(w io.Writer, seq iter.Seq[PathElement], opts SVGOptions) error {
+func WriteSVG(w io.Writer, seq BezPath, opts SVGOptions) error {
 	space := []byte(" ")
 	z := []byte("Z")
 	var err error
@@ -307,7 +305,7 @@ func WriteSVG(w io.Writer, seq iter.Seq[PathElement], opts SVGOptions) error {
 		}
 	}
 	first := true
-	for el := range seq {
+	for _, el := range seq {
 		if err != nil {
 			return err
 		}
@@ -826,6 +824,26 @@ func SolveForPathLength(curve interface {
 		return arclenLast - arclen
 	}
 	return SolveITP(f, 0.0, 1.0, epsilon, 1, 0.2, -arclen, totalArclen-arclen)
+}
+
+func appendPathReplaceMoveTo(out BezPath, rep PathElement, tolerance float64, p Shape) BezPath {
+	n := len(out)
+	out = p.Path(tolerance, out)
+	out[n] = rep
+	return out
+}
+
+func appendPathDropMoveTo(out BezPath, tolerance float64, p Shape) BezPath {
+	if len(out) == 0 {
+		out = p.Path(tolerance, out)
+		return out[1:]
+	} else {
+		n := len(out) - 1
+		last := out[n]
+		out = p.Path(tolerance, out[:n])
+		out[n] = last
+		return out
+	}
 }
 
 // Tables of Legendre-Gauss quadrature coefficients, adapted from:

@@ -8,7 +8,6 @@ package curve
 
 import (
 	"math"
-	"slices"
 	"testing"
 )
 
@@ -27,7 +26,7 @@ func TestCircleAreaSign(t *testing.T) {
 		t.Errorf("got winding number %d, expected 1", w)
 	}
 
-	p := BezPath(slices.Collect(c.PathElements(1e-9)))
+	p := c.Path(1e-9, nil)
 	if ca, pa := c.Area(), p.Area(); !approxEqual(ca, pa) {
 		t.Errorf("got areas %v and %v, expected them to be equal", ca, pa)
 	}
@@ -44,7 +43,7 @@ func TestCircleAreaSign(t *testing.T) {
 		t.Errorf("got winding number %d, expected 1", w)
 	}
 
-	pNegRadius := BezPath(slices.Collect(cNegRadius.PathElements(1e-9)))
+	pNegRadius := cNegRadius.Path(1e-9, nil)
 	if ca, pa := cNegRadius.Area(), pNegRadius.Area(); !approxEqual(ca, pa) {
 		t.Errorf("got areas %v and %v, expected them to be equal", ca, pa)
 	}

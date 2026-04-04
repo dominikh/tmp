@@ -170,7 +170,7 @@ func TestControlBox(t *testing.T) {
 
 func TestGetSegment(t *testing.T) {
 	// Segment(i) should produce the same results as Segments()[i-1]
-	var circle BezPath = slices.Collect(Circle{Pt(10.0, 10.0), 2.0}.PathElements(0.1))
+	circle := Circle{Pt(10.0, 10.0), 2.0}.Path(0.1, nil)
 	segments := slices.Collect(circle.Segments())
 	var getSegments []PathSegment
 	for i := 1; ; i++ {
@@ -376,33 +376,33 @@ func TestReverseClosedLineQuadLine(t *testing.T) {
 }
 
 func TestReverseEmpty(t *testing.T) {
-	reverseHelper(t, []PathElement{}, []PathElement{})
+	reverseHelper(t, BezPath{}, nil)
 }
 
 func TestReverseSinglePoint(t *testing.T) {
 	reverseHelper(
 		t,
-		[]PathElement{MoveTo(Pt(0.0, 0.0))},
-		[]PathElement{MoveTo(Pt(0.0, 0.0))},
+		BezPath{MoveTo(Pt(0.0, 0.0))},
+		BezPath{MoveTo(Pt(0.0, 0.0))},
 	)
 }
 
 func TestReverseSinglePointClosed(t *testing.T) {
 	reverseHelper(
 		t,
-		[]PathElement{MoveTo(Pt(0.0, 0.0)), ClosePath()},
-		[]PathElement{MoveTo(Pt(0.0, 0.0)), ClosePath()},
+		BezPath{MoveTo(Pt(0.0, 0.0)), ClosePath()},
+		BezPath{MoveTo(Pt(0.0, 0.0)), ClosePath()},
 	)
 }
 
 func TestReverseSingleLineOpen(t *testing.T) {
 	reverseHelper(
 		t,
-		[]PathElement{
+		BezPath{
 			MoveTo(Pt(0.0, 0.0)),
 			LineTo(Pt(1.0, 1.0)),
 		},
-		[]PathElement{
+		BezPath{
 			MoveTo(Pt(1.0, 1.0)),
 			LineTo(Pt(0.0, 0.0)),
 		},
@@ -412,11 +412,11 @@ func TestReverseSingleLineOpen(t *testing.T) {
 func TestReverseSingleCurveOpen(t *testing.T) {
 	reverseHelper(
 		t,
-		[]PathElement{
+		BezPath{
 			MoveTo(Pt(0.0, 0.0)),
 			CubicTo(Pt(1.0, 1.0), Pt(2.0, 2.0), Pt(3.0, 3.0)),
 		},
-		[]PathElement{
+		BezPath{
 			MoveTo(Pt(3.0, 3.0)),
 			CubicTo(Pt(2.0, 2.0), Pt(1.0, 1.0), Pt(0.0, 0.0)),
 		},
@@ -426,12 +426,12 @@ func TestReverseSingleCurveOpen(t *testing.T) {
 func TestReverseCurveLineOpen(t *testing.T) {
 	reverseHelper(
 		t,
-		[]PathElement{
+		BezPath{
 			MoveTo(Pt(0.0, 0.0)),
 			CubicTo(Pt(1.0, 1.0), Pt(2.0, 2.0), Pt(3.0, 3.0)),
 			LineTo(Pt(4.0, 4.0)),
 		},
-		[]PathElement{
+		BezPath{
 			MoveTo(Pt(4.0, 4.0)),
 			LineTo(Pt(3.0, 3.0)),
 			CubicTo(Pt(2.0, 2.0), Pt(1.0, 1.0), Pt(0.0, 0.0)),
@@ -442,12 +442,12 @@ func TestReverseCurveLineOpen(t *testing.T) {
 func TestReverseLineCurveOpen(t *testing.T) {
 	reverseHelper(
 		t,
-		[]PathElement{
+		BezPath{
 			MoveTo(Pt(0.0, 0.0)),
 			LineTo(Pt(1.0, 1.0)),
 			CubicTo(Pt(2.0, 2.0), Pt(3.0, 3.0), Pt(4.0, 4.0)),
 		},
-		[]PathElement{
+		BezPath{
 			MoveTo(Pt(4.0, 4.0)),
 			CubicTo(Pt(3.0, 3.0), Pt(2.0, 2.0), Pt(1.0, 1.0)),
 			LineTo(Pt(0.0, 0.0)),
@@ -460,14 +460,14 @@ func TestReverseDuplicatePointAfterMove(t *testing.T) {
 	// Simplified to only use atomic QuadTo (no QuadSplines).
 	reverseHelper(
 		t,
-		[]PathElement{
+		BezPath{
 			MoveTo(Pt(848.0, 348.0)),
 			LineTo(Pt(848.0, 348.0)),
 			QuadTo(Pt(848.0, 526.0), Pt(449.0, 704.0)),
 			QuadTo(Pt(848.0, 171.0), Pt(848.0, 348.0)),
 			ClosePath(),
 		},
-		[]PathElement{
+		BezPath{
 			MoveTo(Pt(848.0, 348.0)),
 			QuadTo(Pt(848.0, 171.0), Pt(449.0, 704.0)),
 			QuadTo(Pt(848.0, 526.0), Pt(848.0, 348.0)),
@@ -481,7 +481,7 @@ func TestReverseDuplicatePointAtEnd(t *testing.T) {
 	// Test case from: https://github.com/googlefonts/fontmake/issues/572
 	reverseHelper(
 		t,
-		[]PathElement{
+		BezPath{
 			MoveTo(Pt(0.0, 651.0)),
 			LineTo(Pt(0.0, 101.0)),
 			LineTo(Pt(0.0, 101.0)),
@@ -489,7 +489,7 @@ func TestReverseDuplicatePointAtEnd(t *testing.T) {
 			LineTo(Pt(0.0, 651.0)),
 			ClosePath(),
 		},
-		[]PathElement{
+		BezPath{
 			MoveTo(Pt(0.0, 651.0)),
 			LineTo(Pt(0.0, 651.0)),
 			LineTo(Pt(0.0, 101.0)),
@@ -504,14 +504,14 @@ func TestReverseLines(t *testing.T) {
 	// https://github.com/fonttools/fonttools/blob/bf265ce49e0cae6f032420a4c80c31d8e16285b8/Tests/pens/reverseContourPen_test.py#L7
 	reverseHelper(
 		t,
-		[]PathElement{
+		BezPath{
 			MoveTo(Pt(0.0, 0.0)),
 			LineTo(Pt(1.0, 1.0)),
 			LineTo(Pt(2.0, 2.0)),
 			LineTo(Pt(3.0, 3.0)),
 			ClosePath(),
 		},
-		[]PathElement{
+		BezPath{
 			MoveTo(Pt(3, 3)),
 			LineTo(Pt(2, 2)),
 			LineTo(Pt(1, 1)),
@@ -521,9 +521,9 @@ func TestReverseLines(t *testing.T) {
 	)
 }
 
-func reverseHelper(t *testing.T, contour, want []PathElement) {
+func reverseHelper(t *testing.T, contour, want BezPath) {
 	t.Helper()
 
-	var got []PathElement = BezPath(contour).ReverseSubpaths()
+	got := BezPath(contour).ReverseSubpaths(nil)
 	diff(t, got, want)
 }

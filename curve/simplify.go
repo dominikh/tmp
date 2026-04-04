@@ -211,10 +211,10 @@ func momentIntegrals2(c CubicBez) (float64, float64, float64) {
 type simplifyState struct {
 	queue       BezPath
 	needsMoveTo bool
+	out         BezPath
 
 	accuracy float64
 	options  SimplifyOptions
-	yield    func(PathElement) bool
 }
 
 func (ss *simplifyState) addSegment(seg PathSegment) {
@@ -243,13 +243,9 @@ func (ss *simplifyState) flush() bool {
 		if !ss.needsMoveTo {
 			els = els[1:]
 		}
-		for _, el := range els {
-			if !ss.yield(el) {
-				break
-			}
-		}
+		ss.out = append(ss.out, els...)
 	} else {
-		s := newSimplifyBezPath(Segments(ss.queue.PathElements(0)))
+		s := newSimplifyBezPath(ss.queue.Segments())
 		var b BezPath
 		switch ss.options.OptLevel {
 		case Subdivide:
@@ -261,9 +257,7 @@ func (ss *simplifyState) flush() bool {
 						continue
 					}
 				}
-				if !ss.yield(el) {
-					return false
-				}
+				ss.out.Push(el)
 			}
 		case Optimized:
 			b = FitToBezPathOpt(s, ss.accuracy)
@@ -271,11 +265,7 @@ func (ss *simplifyState) flush() bool {
 			if !ss.needsMoveTo {
 				els = els[1:]
 			}
-			for _, el := range els {
-				if !ss.yield(el) {
-					return false
-				}
-			}
+			ss.out = append(ss.out, els...)
 		}
 
 	}
@@ -299,66 +289,64 @@ func (ss *simplifyState) flush() bool {
 // We may add such capabilities in the future, possibly as opt-in smoothing
 // specified through the options.
 func Simplify(
-	path iter.Seq[PathElement],
+	path BezPath,
 	accuracy float64,
 	options SimplifyOptions,
-) iter.Seq[PathElement] {
-	return func(yield func(PathElement) bool) {
-		var lastPt maybe.Option[Point]
-		var lastSeg maybe.Option[PathSegment]
-		state := simplifyState{
-			accuracy: accuracy,
-			options:  options,
-			yield:    yield,
-		}
+	out BezPath,
+) BezPath {
+	var lastPt maybe.Option[Point]
+	var lastSeg maybe.Option[PathSegment]
+	state := simplifyState{
+		accuracy: accuracy,
+		options:  options,
+		out:      out,
+	}
 
-		for el := range path {
-			var thisSeg maybe.Option[PathSegment]
-			switch el.Kind {
-			case MoveToKind:
-				state.flush()
-				state.needsMoveTo = true
-				lastPt = maybe.Some(el.P0)
-			case LineToKind:
-				last := lastPt.Unwrap()
-				if last == el.P0 {
-					continue
-				}
-				thisSeg = maybe.Some(Line{last, el.P0}.Seg())
-			case QuadToKind:
-				last := lastPt.Unwrap()
-				if last == el.P0 && last == el.P1 {
-					continue
-				}
-				thisSeg = maybe.Some(QuadBez{last, el.P0, el.P1}.Seg())
-			case CubicToKind:
-				last := lastPt.Unwrap()
-				if last == el.P0 && last == el.P1 && last == el.P2 {
-					continue
-				}
-				thisSeg = maybe.Some(CubicBez{last, el.P0, el.P1, el.P2}.Seg())
-			case ClosePathKind:
-				state.flush()
-				if !yield(ClosePath()) {
-					return
-				}
-				state.needsMoveTo = true
-				lastSeg = maybe.None[PathSegment]()
+	for _, el := range path {
+		var thisSeg maybe.Option[PathSegment]
+		switch el.Kind {
+		case MoveToKind:
+			state.flush()
+			state.needsMoveTo = true
+			lastPt = maybe.Some(el.P0)
+		case LineToKind:
+			last := lastPt.Unwrap()
+			if last == el.P0 {
 				continue
 			}
-			if seg, ok := thisSeg.Get(); ok {
-				if last, ok := lastSeg.Get(); ok {
-					_, lastTan := last.Tangents()
-					thisTan, _ := seg.Tangents()
-					if math.Abs(lastTan.Cross(thisTan)) > math.Abs(lastTan.Dot(thisTan))*options.AngleThresh {
-						state.flush()
-					}
-				}
-				lastPt = maybe.Some(seg.End())
-				state.addSegment(seg)
+			thisSeg = maybe.Some(Line{last, el.P0}.Seg())
+		case QuadToKind:
+			last := lastPt.Unwrap()
+			if last == el.P0 && last == el.P1 {
+				continue
 			}
-			lastSeg = thisSeg
+			thisSeg = maybe.Some(QuadBez{last, el.P0, el.P1}.Seg())
+		case CubicToKind:
+			last := lastPt.Unwrap()
+			if last == el.P0 && last == el.P1 && last == el.P2 {
+				continue
+			}
+			thisSeg = maybe.Some(CubicBez{last, el.P0, el.P1, el.P2}.Seg())
+		case ClosePathKind:
+			state.flush()
+			state.out.ClosePath()
+			state.needsMoveTo = true
+			lastSeg = maybe.None[PathSegment]()
+			continue
 		}
-		state.flush()
+		if seg, ok := thisSeg.Get(); ok {
+			if last, ok := lastSeg.Get(); ok {
+				_, lastTan := last.Tangents()
+				thisTan, _ := seg.Tangents()
+				if math.Abs(lastTan.Cross(thisTan)) > math.Abs(lastTan.Dot(thisTan))*options.AngleThresh {
+					state.flush()
+				}
+			}
+			lastPt = maybe.Some(seg.End())
+			state.addSegment(seg)
+		}
+		lastSeg = thisSeg
 	}
+	state.flush()
+	return state.out
 }

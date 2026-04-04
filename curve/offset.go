@@ -7,7 +7,6 @@
 package curve
 
 import (
-	"iter"
 	"math"
 	"slices"
 
@@ -124,41 +123,46 @@ type subdivisionPoint struct {
 // There is a fair amount of attention to robustness, but this method is not suitable
 // for degenerate cubics with entirely co-linear control points. Those cases should be
 // handled before calling this function, by replacing them with linear segments.
-func offsetCubic(c CubicBez, d float64, tolerance float64) iter.Seq[PathElement] {
-	return func(yield func(PathElement) bool) {
-		// A tuning parameter for regularization. A value too large may distort the curve,
-		// while a value too small may fail to generate smooth curves. This is a somewhat
-		// arbitrary value, and should be revisited.
-		const dimTune = 0.25
-		// We use regularization to perturb the curve to avoid *interior* zero-derivative
-		// cusps. There is robustness logic in place to handle zero derivatives at the
-		// endpoints.
-		//
-		// As a performance note, it might be a good idea to move regularization and
-		// tangent determination to the caller, as those computations are the same for both
-		// signs of `d`.
-		cRegularized := c.regularizeCusp(tolerance * dimTune)
-		co := newCubicOffset(cRegularized, d, tolerance)
-		tan0, tan1 := c.Tangents()
-		utan0 := tan0.Normalize()
-		utan1 := tan1.Normalize()
-		cusp0 := co.endpointCusp(co.q.P0, co.c0)
-		cusp1 := co.endpointCusp(co.q.P2, co.c0+co.c1+co.c2)
+func offsetCubic(
+	c CubicBez,
+	d float64,
+	tolerance float64,
+	pushMoveTo bool,
+	out BezPath,
+) BezPath {
+	// A tuning parameter for regularization. A value too large may distort the curve,
+	// while a value too small may fail to generate smooth curves. This is a somewhat
+	// arbitrary value, and should be revisited.
+	const dimTune = 0.25
+	// We use regularization to perturb the curve to avoid *interior* zero-derivative
+	// cusps. There is robustness logic in place to handle zero derivatives at the
+	// endpoints.
+	//
+	// As a performance note, it might be a good idea to move regularization and
+	// tangent determination to the caller, as those computations are the same for both
+	// signs of `d`.
+	cRegularized := c.regularizeCusp(tolerance * dimTune)
+	co := newCubicOffset(cRegularized, d, tolerance)
+	tan0, tan1 := c.Tangents()
+	utan0 := tan0.Normalize()
+	utan1 := tan1.Normalize()
+	cusp0 := co.endpointCusp(co.q.P0, co.c0)
+	cusp1 := co.endpointCusp(co.q.P2, co.c0+co.c1+co.c2)
 
-		if !yield(MoveTo(c.P0.Translate(utan0.Turn90().Mul(d)))) {
-			return
-		}
-		rec := offsetRec{
-			t0:    0,
-			t1:    1,
-			utan0: utan0,
-			utan1: utan1,
-			cusp0: cusp0,
-			cusp1: cusp1,
-			depth: 0,
-		}
-		co.offsetRec(&rec, yield)
+	if pushMoveTo {
+		out.MoveTo(c.P0.Translate(utan0.Turn90().Mul(d)))
 	}
+
+	rec := offsetRec{
+		t0:    0,
+		t1:    1,
+		utan0: utan0,
+		utan1: utan1,
+		cusp0: cusp0,
+		cusp1: cusp1,
+		depth: 0,
+	}
+	return co.offsetRec(&rec, out)
 }
 
 // Create a new curve from Bézier segment and offset.
@@ -217,7 +221,7 @@ func (co *cubicOffset) endpointCusp(tan Point, y float64) float64 {
 // so, it determines a subdivision point and then recursively calls itself on
 // both subdivisions. If not, it computes a single cubic Bézier to approximate
 // the offset curve.
-func (co *cubicOffset) offsetRec(rec *offsetRec, yield func(PathElement) bool) {
+func (co *cubicOffset) offsetRec(rec *offsetRec, out BezPath) BezPath {
 	// First, determine whether the offset curve contains a cusp. If the sign
 	// of the cusp value (curvature times offset plus 1) is different at the
 	// subdivision endpoints, then there is definitely a cusp inside. Find it and
@@ -245,8 +249,7 @@ func (co *cubicOffset) offsetRec(rec *offsetRec, yield func(PathElement) bool) {
 		utanT := Vec2(co.q.Eval(t)).Normalize()
 		cuspTMinus := math.Copysign(cuspEpsilon, rec.cusp0)
 		cuspTPlus := math.Copysign(cuspEpsilon, rec.cusp1)
-		co.subdivide(rec, yield, t, utanT, cuspTMinus, cuspTPlus)
-		return
+		return co.subdivide(rec, out, t, utanT, cuspTMinus, cuspTPlus)
 	}
 	// We determine the first approximation to the offset curve.
 	a, b := co.drawArc(rec)
@@ -281,12 +284,11 @@ func (co *cubicOffset) offsetRec(rec *offsetRec, yield func(PathElement) bool) {
 		// TODO(robustness): if cusp is extremely near zero, then assign epsilon
 		// with alternate signs based on derivative of cusp.
 		cusp := co.cuspSign(t)
-		co.subdivide(rec, yield, t, utan, cusp, cusp)
+		out = co.subdivide(rec, out, t, utan, cusp, cusp)
 	} else {
-		if !yield(CubicTo(cApprox.P1, cApprox.P2, cApprox.P3)) {
-			return
-		}
+		out.CubicTo(cApprox.P1, cApprox.P2, cApprox.P3)
 	}
+	return out
 }
 
 // subdivide recursively subdivides.
@@ -301,12 +303,12 @@ func (co *cubicOffset) offsetRec(rec *offsetRec, yield func(PathElement) bool) {
 // robustly.
 func (co *cubicOffset) subdivide(
 	rec *offsetRec,
-	yield func(PathElement) bool,
+	into BezPath,
 	t float64,
 	utanT Vec2,
 	cuspTMinus float64,
 	cuspTPlus float64,
-) {
+) BezPath {
 	rec0 := offsetRec{
 		t0:    rec.t0,
 		t1:    t,
@@ -316,7 +318,7 @@ func (co *cubicOffset) subdivide(
 		cusp1: cuspTMinus,
 		depth: rec.depth + 1,
 	}
-	co.offsetRec(&rec0, yield)
+	into = co.offsetRec(&rec0, into)
 	rec1 := offsetRec{
 		t0:    t,
 		t1:    rec.t1,
@@ -326,7 +328,7 @@ func (co *cubicOffset) subdivide(
 		cusp1: rec.cusp1,
 		depth: rec.depth + 1,
 	}
-	co.offsetRec(&rec1, yield)
+	return co.offsetRec(&rec1, into)
 }
 
 // apply converts from (a, b) parameter space to the approximate cubic Bézier.

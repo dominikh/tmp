@@ -66,7 +66,7 @@ func ExampleFitToBezPathOpt() {
 
 	colors := []string{"red", "green", "blue", "purple", "pink", "magenta", "aqua"}
 	i := 0
-	for seg := range curve.Segments(p.Elements()) {
+	for seg := range p.Segments() {
 		// All segments in our path cubic beziers
 		c := colors[i]
 		i = (i + 1) % len(colors)

@@ -7,9 +7,7 @@
 package curve
 
 import (
-	"iter"
 	"math"
-	"slices"
 )
 
 type Ellipse struct {
@@ -140,10 +138,8 @@ func (e Ellipse) BoundingBox() Rect {
 	}
 }
 
-func (e Ellipse) Path(tolerance float64) BezPath { return slices.Collect(e.PathElements(tolerance)) }
-
-// PathElements implements Shape.
-func (e Ellipse) PathElements(tolerance float64) iter.Seq[PathElement] {
+// Path implements Shape.
+func (e Ellipse) Path(tolerance float64, out BezPath) BezPath {
 	radii, xRotation := e.inner.svd()
 	return Arc{
 		Center:     e.Center(),
@@ -151,7 +147,7 @@ func (e Ellipse) PathElements(tolerance float64) iter.Seq[PathElement] {
 		StartAngle: 0.0,
 		SweepAngle: 2 * math.Pi,
 		XRotation:  xRotation,
-	}.PathElements(tolerance)
+	}.Path(tolerance, out)
 }
 
 // PathLength returns the approximated ellipse perimeter.

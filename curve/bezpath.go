@@ -11,12 +11,12 @@ import (
 	"io"
 	"iter"
 	"math"
-	"slices"
 
 	"honnef.co/go/stuff/container/maybe"
 	"honnef.co/go/stuff/math/polyroot"
 )
 
+//go:generate go tool stringer -type=PathElementKind
 type PathElementKind int
 
 const (
@@ -149,25 +149,18 @@ func (seg PathSegment) BoundingBox() Rect {
 	}
 }
 
-func (seg PathSegment) Path(tolerance float64) BezPath {
-	return slices.Collect(seg.PathElements(tolerance))
-}
-
-// PathElements implements Shape.
-func (seg PathSegment) PathElements(tolerance float64) iter.Seq[PathElement] {
-	return func(yield func(PathElement) bool) {
-		if !yield(PathElement{Kind: MoveToKind, P0: seg.P0}) {
-			return
-		}
-		switch seg.Kind {
-		case LineKind:
-			yield(PathElement{Kind: LineToKind, P0: seg.P1})
-		case QuadKind:
-			yield(PathElement{Kind: QuadToKind, P0: seg.P1, P1: seg.P2})
-		case CubicKind:
-			yield(PathElement{Kind: CubicToKind, P0: seg.P1, P1: seg.P2, P2: seg.P3})
-		}
+// Path implements Shape.
+func (seg PathSegment) Path(tolerance float64, out BezPath) BezPath {
+	out.MoveTo(seg.P0)
+	switch seg.Kind {
+	case LineKind:
+		out.LineTo(seg.P1)
+	case QuadKind:
+		out.QuadTo(seg.P1, seg.P2)
+	case CubicKind:
+		out.CubicTo(seg.P1, seg.P2, seg.P3)
 	}
+	return out
 }
 
 var _ Shape = PathSegment{}
@@ -604,11 +597,7 @@ type BezPath []PathElement
 
 var _ Shape = BezPath{}
 
-func (p BezPath) Path(tolerance float64) BezPath { return p }
-
-func (p BezPath) PathElements(tolerance float64) iter.Seq[PathElement] {
-	return slices.Values([]PathElement(p))
-}
+func (p BezPath) Path(tolerance float64, out BezPath) BezPath { return append(out, p...) }
 
 // Transform returns a new path with an affine transformation to the path. See
 // [BezPath.ApplyTransform] for a version that modifies the path in-place.
@@ -660,24 +649,12 @@ func (p *BezPath) CubicTo(p1, p2, p3 Point) { p.Push(CubicTo(p1, p2, p3)) }
 // Push a "close path" element onto the path.
 func (p *BezPath) ClosePath() { p.Push(ClosePath()) }
 
-// Segments returns an iterator over the path's segments.
-func (p BezPath) Segments() iter.Seq[PathSegment] { return Segments(slices.Values(p)) }
-
-// Elements returns an iterator over the path's elements.
-func (p BezPath) Elements() iter.Seq[PathElement] { return slices.Values(p) }
-
 // Truncate truncates the path, keeping the first n elements.
 func (p *BezPath) Truncate(n int) {
 	if n >= len(*p) {
 		return
 	}
 	*p = (*p)[:n]
-}
-
-// Flatten flattens the path to a sequence of lines. See [Flatten] for details on the
-// process.
-func (p BezPath) Flatten(tolerance float64) iter.Seq[PathElement] {
-	return Flatten(p.PathElements(0), tolerance)
 }
 
 func (p BezPath) Area() float64 {
@@ -813,20 +790,20 @@ func (p BezPath) ControlBox() Rect {
 // The current implementation doesn't take any special care to produce a
 // short string (reducing precision, using relative movement).
 func (p BezPath) SVG(opts SVGOptions) string {
-	return SVG(p.Elements(), opts)
+	return SVG(p, opts)
 }
 
 func (p BezPath) WriteSVG(w io.Writer, opts SVGOptions) error {
-	return WriteSVG(w, p.Elements(), opts)
+	return WriteSVG(w, p, opts)
 }
 
 // ReverseSubpaths returns a new path with the winding direction of all subpaths
 // reversed.
-func (p BezPath) ReverseSubpaths() BezPath {
+func (p BezPath) ReverseSubpaths(out BezPath) BezPath {
 	elements := p
 	startIdx := 1
 	startPt := Point{}
-	reversed := BezPath(make([]PathElement, 0, len(elements)))
+	reversed := out
 	// Pending move is used to capture degenerate subpaths that should
 	// remain in the reversed output.
 	pendingMove := false
@@ -932,158 +909,141 @@ func reverseSubpath(startPt Point, els []PathElement, reversed *BezPath) {
 //
 // [Flattening quadratic Béziers]: https://raphlinus.github.io/graphics/curves/2019/12/23/flatten-quadbez.html
 // [Hausdorff distance]: https://en.wikipedia.org/wiki/Hausdorff_distance
-func Flatten(seq iter.Seq[PathElement], tolerance float64) iter.Seq[PathElement] {
-	return func(yield func(PathElement) bool) {
-		// Proportion of tolerance budget that goes to cubic to quadratic conversion.
-		const toQuadTol = 0.1
+func (p BezPath) Flatten(tolerance float64, out BezPath) BezPath {
+	// Proportion of tolerance budget that goes to cubic to quadratic conversion.
+	const toQuadTol = 0.1
 
-		sqrtTol := math.Sqrt(tolerance)
-		var lastPt maybe.Option[Point]
+	sqrtTol := math.Sqrt(tolerance)
+	var lastPt maybe.Option[Point]
 
-		// The sum variable is technically local to some nested scope, but
-		// because of the heavy use of iterators and closures, it escapes.
-		// Declaring it up here means it only produces one allocation per call
-		// to Flatten, instead of one per cubic bezier in the path.
-		var sum float64
-		for el := range seq {
-			switch el.Kind {
-			case MoveToKind:
-				lastPt = maybe.Some(el.P0)
-				if !yield(el) {
-					return
-				}
-			case LineToKind:
-				lastPt = maybe.Some(el.P0)
-				if !yield(el) {
-					return
-				}
-			case QuadToKind:
-				p1, p2 := el.P0, el.P1
-				if p0, ok := lastPt.Get(); ok {
-					// An upper bound on the shortest distance of any point on the quadratic Bezier
-					// curve to the line segment [p0, p2] is 1/2 of the control-point-to-line-segment
-					// distance.
-					//
-					// The derivation is similar to that for the cubic Bezier (see below). In
-					// short:
-					//
-					// q(t) = B0(t) p0 + B1(t) p1 + B2(t) p2
-					// dist(q(t), [p0, p1]) <= B1(t) dist(p1, [p0, p1])
-					//                       = 2 (1-t)t dist(p1, [p0, p1]).
-					//
-					// The maximum occurs at t=1/2, hence
-					// max(dist(q(t), [p0, p1] <= 1/2 dist(p1, [p0, p1])).
-					//
-					// The following takes the square to elide the square root of the Euclidean
-					// distance.
-					line := Line{p0, p2}
-					if distSq, _ := line.Nearest(p1, 0); distSq <= 4*tolerance*tolerance {
-						if !yield(LineTo(p2)) {
-							return
-						}
-					} else {
-						q := QuadBez{p0, p1, p2}
-						params := q.estimateSubdiv(sqrtTol)
-						n := max(int(math.Ceil(0.5*params.val/sqrtTol)), 1)
-						step := 1.0 / float64(n)
-						for i := 1; i < n; i++ {
-							u := float64(i) * step
-							t := q.determineSubdivT(&params, u)
-							p := q.Eval(t)
-							if !yield(LineTo(p)) {
-								return
-							}
-						}
-						if !yield(LineTo(p2)) {
-							return
-						}
+	// The sum variable is technically local to some nested scope, but
+	// because of the heavy use of iterators and closures, it escapes.
+	// Declaring it up here means it only produces one allocation per call
+	// to Flatten, instead of one per cubic bezier in the path.
+	var sum float64
+	for _, el := range p {
+		switch el.Kind {
+		case MoveToKind:
+			lastPt = maybe.Some(el.P0)
+			out.Push(el)
+		case LineToKind:
+			lastPt = maybe.Some(el.P0)
+			out.Push(el)
+		case QuadToKind:
+			p1, p2 := el.P0, el.P1
+			if p0, ok := lastPt.Get(); ok {
+				// An upper bound on the shortest distance of any point on the quadratic Bezier
+				// curve to the line segment [p0, p2] is 1/2 of the control-point-to-line-segment
+				// distance.
+				//
+				// The derivation is similar to that for the cubic Bezier (see below). In
+				// short:
+				//
+				// q(t) = B0(t) p0 + B1(t) p1 + B2(t) p2
+				// dist(q(t), [p0, p1]) <= B1(t) dist(p1, [p0, p1])
+				//                       = 2 (1-t)t dist(p1, [p0, p1]).
+				//
+				// The maximum occurs at t=1/2, hence
+				// max(dist(q(t), [p0, p1] <= 1/2 dist(p1, [p0, p1])).
+				//
+				// The following takes the square to elide the square root of the Euclidean
+				// distance.
+				line := Line{p0, p2}
+				if distSq, _ := line.Nearest(p1, 0); distSq <= 4*tolerance*tolerance {
+					out.LineTo(p2)
+				} else {
+					q := QuadBez{p0, p1, p2}
+					params := q.estimateSubdiv(sqrtTol)
+					n := max(int(math.Ceil(0.5*params.val/sqrtTol)), 1)
+					step := 1.0 / float64(n)
+					for i := 1; i < n; i++ {
+						u := float64(i) * step
+						t := q.determineSubdivT(&params, u)
+						p := q.Eval(t)
+						out.LineTo(p)
 					}
-				}
-				lastPt = maybe.Some(p2)
-			case CubicToKind:
-				p1, p2, p3 := el.P0, el.P1, el.P2
-				if p0, ok := lastPt.Get(); ok {
-					// An upper bound on the shortest distance of any point on the cubic Bezier
-					// curve to the line segment [p0, p3] is 3/4 of the maximum of the
-					// control-point-to-line-segment distances.
-					//
-					// With Bernstein weights Bi(t), we have
-					// c(t) = B0(t) p0 + B1(t) p1 + B2(t) p2 + B3(t) p3
-					// with t from 0 to 1 (inclusive).
-					//
-					// Through convexivity of the Euclidean distance function and the line segment,
-					// we have
-					// dist(c(t), [p0, p3]) <= B1(t) dist(p1, [p0, p3]) + B2(t) dist(p2, [p0, p3])
-					//                      <= (B1(t) + B2(t)) max(dist(p1, [p0, p3]), dist(p2, [p0, p3]))
-					//                       = 3 ((1-t)t^2 + (1-t)^2t) max(dist(p1, [p0, p3]), dist(p2, [p0, p3])).
-					//
-					// The inner polynomial has its maximum of 1/4 at t=1/2, hence
-					// max(dist(c(t), [p0, p3])) <= 3/4 max(dist(p1, [p0, p3]), dist(p2, [p0, p3])).
-					//
-					// The following takes the square to elide the square root of the Euclidean
-					// distance.
-					line := Line{p0, p3}
-					distSq1, _ := line.Nearest(p1, 0)
-					distSq2, _ := line.Nearest(p2, 0)
-					if max(distSq1, distSq2) <= 16.0/9.0*(tolerance*tolerance) {
-						if !yield(LineTo(p3)) {
-							return
-						}
-					} else {
-						c := CubicBez{p0, p1, p2, p3}
-
-						// Subdivide into quadratics, and estimate the number of
-						// subdivisions required for each, summing to arrive at an
-						// estimate for the number of subdivisions for the cubic.
-						sqrtRemainTol := sqrtTol * math.Sqrt(1.0-toQuadTol)
-						sum = 0.0
-						for quad := range c.Quadratics(tolerance * toQuadTol) {
-							q := quad.Segment
-							params := q.estimateSubdiv(sqrtRemainTol)
-							sum += params.val
-						}
-
-						// Iterate through the quadratics, outputting the points of
-						// subdivisions that fall within that quadratic.
-						n := max(int(math.Ceil(0.5*sum/sqrtRemainTol)), 1)
-						step := sum / float64(n)
-						i := 1
-						valSum := 0.0
-						for quad := range c.Quadratics(tolerance * toQuadTol) {
-							q := quad.Segment
-							params := q.estimateSubdiv(sqrtRemainTol)
-							target := float64(i) * step
-							recipVal := 1.0 / params.val
-							for target < valSum+params.val {
-								u := (target - valSum) * recipVal
-								t := q.determineSubdivT(&params, u)
-								p := q.Eval(t)
-								if !yield(LineTo(p)) {
-									return
-								}
-								i += 1
-								if i == n+1 {
-									break
-								}
-								target = float64(i) * step
-							}
-							valSum += params.val
-						}
-
-						if !yield(LineTo(p3)) {
-							return
-						}
-					}
-				}
-				lastPt = maybe.Some(p3)
-			case ClosePathKind:
-				lastPt = maybe.None[Point]()
-				if !yield(el) {
-					return
+					out.LineTo(p2)
 				}
 			}
+			lastPt = maybe.Some(p2)
+		case CubicToKind:
+			p1, p2, p3 := el.P0, el.P1, el.P2
+			if p0, ok := lastPt.Get(); ok {
+				// An upper bound on the shortest distance of any point on the cubic Bezier
+				// curve to the line segment [p0, p3] is 3/4 of the maximum of the
+				// control-point-to-line-segment distances.
+				//
+				// With Bernstein weights Bi(t), we have
+				// c(t) = B0(t) p0 + B1(t) p1 + B2(t) p2 + B3(t) p3
+				// with t from 0 to 1 (inclusive).
+				//
+				// Through convexivity of the Euclidean distance function and the line segment,
+				// we have
+				// dist(c(t), [p0, p3]) <= B1(t) dist(p1, [p0, p3]) + B2(t) dist(p2, [p0, p3])
+				//                      <= (B1(t) + B2(t)) max(dist(p1, [p0, p3]), dist(p2, [p0, p3]))
+				//                       = 3 ((1-t)t^2 + (1-t)^2t) max(dist(p1, [p0, p3]), dist(p2, [p0, p3])).
+				//
+				// The inner polynomial has its maximum of 1/4 at t=1/2, hence
+				// max(dist(c(t), [p0, p3])) <= 3/4 max(dist(p1, [p0, p3]), dist(p2, [p0, p3])).
+				//
+				// The following takes the square to elide the square root of the Euclidean
+				// distance.
+				line := Line{p0, p3}
+				distSq1, _ := line.Nearest(p1, 0)
+				distSq2, _ := line.Nearest(p2, 0)
+				if max(distSq1, distSq2) <= 16.0/9.0*(tolerance*tolerance) {
+					out.LineTo(p3)
+				} else {
+					c := CubicBez{p0, p1, p2, p3}
+
+					// Subdivide into quadratics, and estimate the number of
+					// subdivisions required for each, summing to arrive at an
+					// estimate for the number of subdivisions for the cubic.
+					sqrtRemainTol := sqrtTol * math.Sqrt(1.0-toQuadTol)
+					sum = 0.0
+					for quad := range c.Quadratics(tolerance * toQuadTol) {
+						q := quad.Segment
+						params := q.estimateSubdiv(sqrtRemainTol)
+						sum += params.val
+					}
+
+					// Iterate through the quadratics, outputting the points of
+					// subdivisions that fall within that quadratic.
+					n := max(int(math.Ceil(0.5*sum/sqrtRemainTol)), 1)
+					step := sum / float64(n)
+					i := 1
+					valSum := 0.0
+					for quad := range c.Quadratics(tolerance * toQuadTol) {
+						q := quad.Segment
+						params := q.estimateSubdiv(sqrtRemainTol)
+						target := float64(i) * step
+						recipVal := 1.0 / params.val
+						for target < valSum+params.val {
+							u := (target - valSum) * recipVal
+							t := q.determineSubdivT(&params, u)
+							p := q.Eval(t)
+							out.LineTo(p)
+							i += 1
+							if i == n+1 {
+								break
+							}
+							target = float64(i) * step
+						}
+						valSum += params.val
+					}
+
+					out.LineTo(p3)
+				}
+			}
+			lastPt = maybe.Some(p3)
+		case ClosePathKind:
+			// FIXME(dh): lastPt should be that of the previous MoveTo
+			lastPt = maybe.None[Point]()
+			out.Push(el)
 		}
 	}
+
+	return out
 }
 
 func SegmentsPerimeter(seq iter.Seq[PathSegment], accuracy float64) float64 {

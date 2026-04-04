@@ -7,9 +7,7 @@
 package curve
 
 import (
-	"iter"
 	"math"
-	"slices"
 )
 
 type Arc struct {
@@ -23,43 +21,37 @@ type Arc struct {
 var _ Shape = Arc{}
 var _ ParametricCurve = Arc{}
 
-func (a Arc) Path(tolerance float64) BezPath { return slices.Collect(a.PathElements(tolerance)) }
+func (a Arc) Path(tolerance float64, out BezPath) BezPath {
+	out.MoveTo(a.Start())
 
-func (a Arc) PathElements(tolerance float64) iter.Seq[PathElement] {
-	return func(yield func(PathElement) bool) {
-		if !yield(MoveTo(a.Start())) {
-			return
-		}
+	sweepAngle := clampAngle(a.SweepAngle)
+	scaledError := max(a.Radii.X, a.Radii.Y) / tolerance
+	// Number of subdivisions per ellipse based on error tolerance.
+	// Note: this may slightly underestimate the error for quadrants.
+	nError := max(math.Pow(1.1163*scaledError, 1.0/6.0), 3.999_999)
+	n := math.Ceil(nError * math.Abs(sweepAngle) * (1.0 / (2.0 * math.Pi)))
+	angleStep := sweepAngle / n
+	armLen := math.Copysign((4.0/3.0)*math.Tan(math.Abs(0.25*angleStep)), sweepAngle)
+	angle0 := normalizeAngle(a.StartAngle)
+	p0 := sampleEllipse(a.Radii, a.XRotation, angle0)
 
-		sweepAngle := clampAngle(a.SweepAngle)
-		scaledError := max(a.Radii.X, a.Radii.Y) / tolerance
-		// Number of subdivisions per ellipse based on error tolerance.
-		// Note: this may slightly underestimate the error for quadrants.
-		nError := max(math.Pow(1.1163*scaledError, 1.0/6.0), 3.999_999)
-		n := math.Ceil(nError * math.Abs(sweepAngle) * (1.0 / (2.0 * math.Pi)))
-		angleStep := sweepAngle / n
-		armLen := math.Copysign((4.0/3.0)*math.Tan(math.Abs(0.25*angleStep)), sweepAngle)
-		angle0 := normalizeAngle(a.StartAngle)
-		p0 := sampleEllipse(a.Radii, a.XRotation, angle0)
+	for range int(n) {
+		angle1 := angle0 + angleStep
+		p1 := p0.Add(sampleEllipse(a.Radii, a.XRotation, angle0+math.Pi/2).Mul(armLen))
+		p3 := sampleEllipse(a.Radii, a.XRotation, angle1)
+		p2 := p3.Sub(sampleEllipse(a.Radii, a.XRotation, angle1+math.Pi/2).Mul(armLen))
 
-		for range int(n) {
-			angle1 := angle0 + angleStep
-			p1 := p0.Add(sampleEllipse(a.Radii, a.XRotation, angle0+math.Pi/2).Mul(armLen))
-			p3 := sampleEllipse(a.Radii, a.XRotation, angle1)
-			p2 := p3.Sub(sampleEllipse(a.Radii, a.XRotation, angle1+math.Pi/2).Mul(armLen))
+		angle0 = angle1
+		p0 = p3
 
-			angle0 = angle1
-			p0 = p3
-
-			if !yield(CubicTo(
-				a.Center.Translate(p1),
-				a.Center.Translate(p2),
-				a.Center.Translate(p3),
-			)) {
-				break
-			}
-		}
+		out.CubicTo(
+			a.Center.Translate(p1),
+			a.Center.Translate(p2),
+			a.Center.Translate(p3),
+		)
 	}
+
+	return out
 }
 
 // Take the ellipse radii, how the radii are rotated, and the sweep angle, and return a

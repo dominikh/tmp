@@ -269,7 +269,7 @@ func TestArcPerimeterMatchesBezierApproximation(t *testing.T) {
 	}
 
 	got := arc.PathLength(1e-12)
-	approx := arc.Path(1e-11).PathLength(1e-12)
+	approx := arc.Path(1e-11, nil).PathLength(1e-12)
 	if math.Abs(got-approx) > 2e-11 {
 		t.Fatalf("Perimeter() = %g, bezier approximation = %g", got, approx)
 	}

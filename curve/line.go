@@ -7,9 +7,7 @@
 package curve
 
 import (
-	"iter"
 	"math"
-	"slices"
 )
 
 // Line represents a line segment. It is both a [Shape] and a [ParametricCurve].
@@ -70,13 +68,10 @@ func (l Line) PathLength(accuracy float64) float64 {
 	return l.P1.Sub(l.P0).Hypot()
 }
 
-func (l Line) Path(tolerance float64) BezPath { return slices.Collect(l.PathElements(tolerance)) }
-
-func (l Line) PathElements(tolerance float64) iter.Seq[PathElement] {
-	return func(yield func(PathElement) bool) {
-		_ = yield(MoveTo(l.P0)) &&
-			yield(LineTo(l.P1))
-	}
+func (l Line) Path(tolerance float64, out BezPath) BezPath {
+	out.MoveTo(l.P0)
+	out.LineTo(l.P1)
+	return out
 }
 
 func (l Line) Eval(t float64) Point {

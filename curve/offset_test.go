@@ -7,7 +7,6 @@
 package curve
 
 import (
-	"iter"
 	"testing"
 )
 
@@ -22,10 +21,8 @@ func TestOffsetPathologicalCurves(t *testing.T) {
 	const offset = 3603.7267536453924
 	const accuracy = 0.1
 
-	path := offsetCubic(curve, offset, accuracy)
-	next, cancel := iter.Pull(path)
-	defer cancel()
-	if v, ok := next(); !ok || v.Kind != MoveToKind {
+	path := offsetCubic(curve, offset, accuracy, true, nil)
+	if len(path) == 0 || path[0].Kind != MoveToKind {
 		t.Fatalf("did not get valid path")
 	}
 }
@@ -41,8 +38,7 @@ func TestOffsetInfiniteRecursion(t *testing.T) {
 		Pt(1056.7901234567901, 593.90243902439033),
 	}
 	// Test that we terminate
-	for range offsetCubic(c, offset, tolerance) {
-	}
+	offsetCubic(c, offset, tolerance, true, nil)
 }
 
 func TestCubicOffsetSimpleLine(t *testing.T) {
@@ -53,6 +49,5 @@ func TestCubicOffsetSimpleLine(t *testing.T) {
 		Pt(30.0, 0.0),
 	}
 	// Test that we terminate
-	for range offsetCubic(cubic, 5, 1e-6) {
-	}
+	offsetCubic(cubic, 5, 1e-6, true, nil)
 }

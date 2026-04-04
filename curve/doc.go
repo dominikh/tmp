@@ -156,27 +156,6 @@
 // shapes, as these are only meaningful when specifying the direction of the
 // y-axis.
 //
-// # Iterators
-//
-// Many functions in this package can operate on individual path elements or
-// segments at a time and don't need random access. Similarly, many functions
-// don't have to remember or modify the sequence of path elements or segments
-// they produce. In those cases, they accept and return iterators, to avoid
-// having to allocate slices.
-//
-// Functions that cannot work with iterators directly will instead accept or
-// return slices, to make it clear that they allocate. You can use
-// [slices.Collect] to turn iterators into slices, and [slices.Values] to turn
-// slices into iterators.
-//
-// A notable example are [FitToBezPath] and [FitToBezPathOpt]. The former
-// returns an iterator, as it can produce elements one at a time. The latter has
-// to do backtracking to find the optimal solution, and thus returns the slice
-// it had to build up.
-//
-// Many functions, such as [Dash] or [Simplify] can be considered adapters that
-// map from one sequence to another.
-//
 // # Oriented area / signed area
 //
 // The Area method on shapes returns their oriented area. The oriented area of a

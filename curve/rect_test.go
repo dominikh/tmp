@@ -8,7 +8,6 @@ package curve
 
 import (
 	"math"
-	"slices"
 	"testing"
 )
 
@@ -26,7 +25,7 @@ func TestRectAreaSign(t *testing.T) {
 		t.Errorf("got winding %v, want %v", w, 1)
 	}
 
-	var p BezPath = slices.Collect(r.PathElements(1e-9))
+	p := (r.Path(1e-9, nil))
 	if ra, pa := r.Area(), p.Area(); !approxEqual(ra, pa) {
 		t.Errorf("expected r's and p's areas to be approximately equal, got %v and %v", ra, pa)
 	}
@@ -43,7 +42,7 @@ func TestRectAreaSign(t *testing.T) {
 		t.Errorf("got winding %v, want %v", w, -1)
 	}
 
-	var pFlip BezPath = slices.Collect(rFlip.PathElements(1e09))
+	pFlip := (rFlip.Path(1e09, nil))
 	if ra, pa := rFlip.Area(), pFlip.Area(); !approxEqual(ra, pa) {
 		t.Errorf("expected r's and p's areas to be approximately equal, got %v and %v", ra, pa)
 	}
@@ -145,7 +144,7 @@ func TestRoundedRectWinding(t *testing.T) {
 
 func TestRoundedRectBeziers(t *testing.T) {
 	rect := NewRoundedRect(-5, -5, 10, 20, 5)
-	p := BezPath(slices.Collect(rect.PathElements(1e-9)))
+	p := rect.Path(1e-9, nil)
 	// Note: could be more systematic about tolerance tightness.
 	const epsilon = 1e-7
 	if ra, pa := rect.Area(), p.Area(); math.Abs(ra-pa) > epsilon {

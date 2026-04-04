@@ -7,9 +7,7 @@
 package curve
 
 import (
-	"iter"
 	"math"
-	"slices"
 )
 
 // Rect describes a rectangle defined by its minimum and maximum coordinates.
@@ -216,6 +214,9 @@ func (r Rect) UnionPoint(pt Point) Rect {
 // The result is zero-area if either input has negative width or
 // height. The result always has non-negative width and height.
 func (r Rect) Intersect(o Rect) Rect {
+	if !r.Exists() || !o.Exists() {
+		return Rect{1, 1, 0, 0}
+	}
 	x0 := max(r.X0, o.X0)
 	y0 := max(r.Y0, o.Y0)
 	x1 := min(r.X1, o.X1)
@@ -413,16 +414,13 @@ func (r Rect) Winding(pt Point) int {
 	}
 }
 
-func (r Rect) Path(tolerance float64) BezPath { return slices.Collect(r.PathElements(tolerance)) }
-
-func (r Rect) PathElements(tolerance float64) iter.Seq[PathElement] {
-	return func(yield func(PathElement) bool) {
-		_ = yield(MoveTo(Pt(r.X0, r.Y0))) &&
-			yield(LineTo(Pt(r.X1, r.Y0))) &&
-			yield(LineTo(Pt(r.X1, r.Y1))) &&
-			yield(LineTo(Pt(r.X0, r.Y1))) &&
-			yield(ClosePath())
-	}
+func (r Rect) Path(tolerance float64, out BezPath) BezPath {
+	out.MoveTo(Pt(r.X0, r.Y0))
+	out.LineTo(Pt(r.X1, r.Y0))
+	out.LineTo(Pt(r.X1, r.Y1))
+	out.LineTo(Pt(r.X0, r.Y1))
+	out.ClosePath()
+	return out
 }
 
 // RoundedRect creates a new [RoundedRect] from this rectangle and the provided
@@ -510,27 +508,15 @@ func (r RoundedRect) Area() float64 {
 		corner(r.Radii[3])
 }
 
-func dropFirst[T any](seq iter.Seq[T]) iter.Seq[T] {
-	return func(yield func(T) bool) {
-		first := true
-		for el := range seq {
-			if first {
-				first = false
-				continue
-			}
-			if !yield(el) {
-				break
-			}
-		}
+func dropFirst[S ~[]E, E any](s S) S {
+	if len(s) == 0 {
+		return s
 	}
+	return s[1:]
 }
 
-func (r RoundedRect) Path(tolerance float64) BezPath {
-	return slices.Collect(r.PathElements(tolerance))
-}
-
-func (r RoundedRect) PathElements(tolerance float64) iter.Seq[PathElement] {
-	buildArcIter := func(i int, center Point, ellipseRadii Vec2) iter.Seq[PathElement] {
+func (r RoundedRect) Path(tolerance float64, out BezPath) BezPath {
+	buildArc := func(i int, center Point, ellipseRadii Vec2) {
 		a := Arc{
 			Center:     center,
 			Radii:      ellipseRadii,
@@ -538,95 +524,76 @@ func (r RoundedRect) PathElements(tolerance float64) iter.Seq[PathElement] {
 			SweepAngle: math.Pi / 2,
 			XRotation:  0.0,
 		}
-		return dropFirst(a.PathElements(tolerance))
+		out = appendPathDropMoveTo(out, tolerance, a)
 	}
 
-	arcs := [...]iter.Seq[PathElement]{
-		buildArcIter(
-			2,
-			Point{
-				X: r.Rect.X0 + r.Radii[0],
-				Y: r.Rect.Y0 + r.Radii[0],
-			},
-			Vec2{
-				X: r.Radii[0],
-				Y: r.Radii[0],
-			},
-		),
-		buildArcIter(
-			3,
-			Point{
-				X: r.Rect.X1 - r.Radii[1],
-				Y: r.Rect.Y0 + r.Radii[1],
-			},
-			Vec2{
-				X: r.Radii[1],
-				Y: r.Radii[1],
-			},
-		),
-		buildArcIter(
-			0,
-			Point{
-				X: r.Rect.X1 - r.Radii[2],
-				Y: r.Rect.Y1 - r.Radii[2],
-			},
-			Vec2{
-				X: r.Radii[2],
-				Y: r.Radii[2],
-			},
-		),
-		buildArcIter(
-			1,
-			Point{
-				X: r.Rect.X0 + r.Radii[3],
-				Y: r.Rect.Y1 - r.Radii[3],
-			},
-			Vec2{
-				X: r.Radii[3],
-				Y: r.Radii[3],
-			},
-		),
-	}
+	out.MoveTo(Pt(
+		r.Rect.X0,
+		r.Rect.Y0+r.Radii[0],
+	))
 
-	rect := []PathElement{
-		LineTo(Pt(
-			r.Rect.X1-r.Radii[1],
-			r.Rect.Y0,
-		)),
-		LineTo(Pt(
-			r.Rect.X1,
-			r.Rect.Y1-r.Radii[2],
-		)),
-		LineTo(Pt(
-			r.Rect.X0+r.Radii[3],
-			r.Rect.Y1,
-		)),
-		ClosePath(),
-	}
+	buildArc(
+		2,
+		Point{
+			X: r.Rect.X0 + r.Radii[0],
+			Y: r.Rect.Y0 + r.Radii[0],
+		},
+		Vec2{
+			X: r.Radii[0],
+			Y: r.Radii[0],
+		},
+	)
+	out.LineTo(Pt(
+		r.Rect.X1-r.Radii[1],
+		r.Rect.Y0,
+	))
 
-	return func(yield func(PathElement) bool) {
-		e := MoveTo(Pt(
-			r.Rect.X0,
-			r.Rect.Y0+r.Radii[0],
-		))
-		if !yield(e) {
-			return
-		}
+	buildArc(
+		3,
+		Point{
+			X: r.Rect.X1 - r.Radii[1],
+			Y: r.Rect.Y0 + r.Radii[1],
+		},
+		Vec2{
+			X: r.Radii[1],
+			Y: r.Radii[1],
+		},
+	)
+	out.LineTo(Pt(
+		r.Rect.X1,
+		r.Rect.Y1-r.Radii[2],
+	))
 
-		// Generate the arc curve elements.
-		// When we've reached the end of the arc, add a line towards next arc.
-		for i, arc := range arcs {
-			for e := range arc {
-				if !yield(e) {
-					return
-				}
-			}
-			e := rect[i]
-			if !yield(e) {
-				return
-			}
-		}
-	}
+	buildArc(
+		0,
+		Point{
+			X: r.Rect.X1 - r.Radii[2],
+			Y: r.Rect.Y1 - r.Radii[2],
+		},
+		Vec2{
+			X: r.Radii[2],
+			Y: r.Radii[2],
+		},
+	)
+	out.LineTo(Pt(
+		r.Rect.X0+r.Radii[3],
+		r.Rect.Y1,
+	))
+
+	buildArc(
+		1,
+		Point{
+			X: r.Rect.X0 + r.Radii[3],
+			Y: r.Rect.Y1 - r.Radii[3],
+		},
+		Vec2{
+			X: r.Radii[3],
+			Y: r.Radii[3],
+		},
+	)
+	out.ClosePath()
+
+	return out
 }
 
 func (r RoundedRect) PathLength(accuracy float64) float64 {

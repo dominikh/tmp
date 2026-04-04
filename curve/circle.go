@@ -7,9 +7,7 @@
 package curve
 
 import (
-	"iter"
 	"math"
-	"slices"
 )
 
 type Circle struct {
@@ -24,55 +22,47 @@ func (c Circle) Contains(pt Point) bool {
 	return c.Winding(pt) != 0
 }
 
-func (c Circle) Path(tolerance float64) BezPath { return slices.Collect(c.PathElements(tolerance)) }
-
-func (c Circle) PathElements(tolerance float64) iter.Seq[PathElement] {
-	return func(yield func(PathElement) bool) {
-		scaledError := math.Abs(c.Radius) / tolerance
-		var n int
-		var armLength float64
-		if scaledError < 1.0/1.9608e-4 {
-			// Solution from http://spencermortensen.com/articles/bezier-circle/
-			n = 4
-			armLength = 0.551915024494
-		} else {
-			// This is empirically determined to fall within error tolerance.
-			n = int(math.Ceil(math.Pow(1.1163*scaledError, 1.0/6.0)))
-			// Note: this isn't minimum error, but it is simple and we can easily
-			// estimate the error.
-			armLength = (4.0 / 3.0) * math.Tan(math.Pi/2/(float64(n)))
-		}
-
-		x, y := c.Center.Splat()
-		r := c.Radius
-		if !yield(MoveTo(Pt(x+r, y))) {
-			return
-		}
-		deltaTh := 2.0 * math.Pi / float64(n)
-		for ix := 1; ix <= n; ix++ {
-			a := armLength
-			th1 := deltaTh * float64(ix)
-			th0 := th1 - deltaTh
-			s0, c0 := math.Sincos(th0)
-			var s1, c1 float64
-			if ix == n {
-				s1 = 0.0
-				c1 = 1.0
-			} else {
-				s1, c1 = math.Sincos(th1)
-			}
-			if !yield(CubicTo(
-				Pt(x+r*(c0-a*s0), y+r*(s0+a*c0)),
-				Pt(x+r*(c1+a*s1), y+r*(s1-a*c1)),
-				Pt(x+r*c1, y+r*s1),
-			)) {
-				return
-			}
-		}
-		if !yield(ClosePath()) {
-			return
-		}
+func (c Circle) Path(tolerance float64, out BezPath) BezPath {
+	scaledError := math.Abs(c.Radius) / tolerance
+	var n int
+	var armLength float64
+	if scaledError < 1.0/1.9608e-4 {
+		// Solution from http://spencermortensen.com/articles/bezier-circle/
+		n = 4
+		armLength = 0.551915024494
+	} else {
+		// This is empirically determined to fall within error tolerance.
+		n = int(math.Ceil(math.Pow(1.1163*scaledError, 1.0/6.0)))
+		// Note: this isn't minimum error, but it is simple and we can easily
+		// estimate the error.
+		armLength = (4.0 / 3.0) * math.Tan(math.Pi/2/(float64(n)))
 	}
+
+	x, y := c.Center.Splat()
+	r := c.Radius
+
+	out.MoveTo(Pt(x+r, y))
+	deltaTh := 2.0 * math.Pi / float64(n)
+	for ix := 1; ix <= n; ix++ {
+		a := armLength
+		th1 := deltaTh * float64(ix)
+		th0 := th1 - deltaTh
+		s0, c0 := math.Sincos(th0)
+		var s1, c1 float64
+		if ix == n {
+			s1 = 0.0
+			c1 = 1.0
+		} else {
+			s1, c1 = math.Sincos(th1)
+		}
+		out.CubicTo(
+			Pt(x+r*(c0-a*s0), y+r*(s0+a*c0)),
+			Pt(x+r*(c1+a*s1), y+r*(s1-a*c1)),
+			Pt(x+r*c1, y+r*s1),
+		)
+	}
+	out.ClosePath()
+	return out
 }
 
 // Sector returns a sector of the circle. The start angle gets
@@ -148,10 +138,6 @@ func (cs CircleSector) Contains(pt Point) bool {
 	return cs.Winding(pt) != 0
 }
 
-func (cs CircleSector) Path(tolerance float64) BezPath {
-	return slices.Collect(cs.PathElements(tolerance))
-}
-
 func (cs CircleSector) Arc() Arc {
 	return Arc{
 		Center:     cs.Center,
@@ -162,28 +148,21 @@ func (cs CircleSector) Arc() Arc {
 	}
 }
 
-// PathElements implements Shape.
-func (cs CircleSector) PathElements(tolerance float64) iter.Seq[PathElement] {
+// Path implements Shape.
+func (cs CircleSector) Path(tolerance float64, out BezPath) BezPath {
 	if math.Abs(cs.SweepAngle) < 2*math.Pi {
-		return func(yield func(PathElement) bool) {
-			if !yield(MoveTo(cs.Center)) {
-				return
-			}
-			if !yield(LineTo(pointOnCircle(cs.Center, cs.Radius, cs.StartAngle))) {
-				return
-			}
-			a := cs.Arc()
-			for el := range dropFirst(a.PathElements(tolerance)) {
-				if !yield(el) {
-					return
-				}
-			}
-			if !yield(LineTo(cs.Center)) {
-				return
-			}
-		}
+		out.MoveTo(cs.Center)
+
+		out = appendPathReplaceMoveTo(
+			out,
+			LineTo(pointOnCircle(cs.Center, cs.Radius, cs.StartAngle)),
+			tolerance,
+			cs.Arc(),
+		)
+		out.LineTo(cs.Center)
+		return out
 	} else {
-		return cs.Arc().PathElements(tolerance)
+		return cs.Arc().Path(tolerance, out)
 	}
 }
 

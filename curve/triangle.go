@@ -7,9 +7,7 @@
 package curve
 
 import (
-	"iter"
 	"math"
-	"slices"
 )
 
 type Triangle struct {
@@ -32,17 +30,12 @@ func (t Triangle) Contains(pt Point) bool {
 	return t.Winding(pt) != 0
 }
 
-func (t Triangle) Path(tolerance float64) BezPath {
-	return slices.Collect(t.PathElements(tolerance))
-}
-
-func (t Triangle) PathElements(tolerance float64) iter.Seq[PathElement] {
-	return func(yield func(PathElement) bool) {
-		_ = yield(MoveTo(t.P0)) &&
-			yield(LineTo(t.P1)) &&
-			yield(LineTo(t.P2)) &&
-			yield(ClosePath())
-	}
+func (t Triangle) Path(tolerance float64, out BezPath) BezPath {
+	out.MoveTo(t.P0)
+	out.LineTo(t.P1)
+	out.LineTo(t.P2)
+	out.ClosePath()
+	return out
 }
 
 // Centroid returns the triangle's centroid.

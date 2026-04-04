@@ -9,7 +9,6 @@ package curve
 import (
 	"iter"
 	"math"
-	"slices"
 	"sort"
 
 	"honnef.co/go/stuff/math/polyroot"
@@ -40,14 +39,11 @@ func (c CubicBez) BoundingBox() Rect {
 	return BoundingBox(c)
 }
 
-func (c CubicBez) Path(tolerance float64) BezPath { return slices.Collect(c.PathElements(tolerance)) }
-
-// PathElements implements [Shape].
-func (c CubicBez) PathElements(tolerance float64) iter.Seq[PathElement] {
-	return func(yield func(PathElement) bool) {
-		_ = yield(MoveTo(c.P0)) &&
-			yield(CubicTo(c.P1, c.P2, c.P3))
-	}
+// Path implements [Shape].
+func (c CubicBez) Path(tolerance float64, out BezPath) BezPath {
+	out.MoveTo(c.P0)
+	out.CubicTo(c.P1, c.P2, c.P3)
+	return out
 }
 
 // PathLength returns the arc length of a cubic Bézier segment.

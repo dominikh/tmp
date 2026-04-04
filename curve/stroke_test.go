@@ -16,14 +16,14 @@ func BenchmarkDash(b *testing.B) {
 	shape := Rect{X0: 5, Y0: 5, X1: 20, Y1: 20}.RoundedRect(RoundedRectRadii{2, 2, 2, 2})
 
 	for range b.N {
-		for range StrokePath(
-			shape.PathElements(0.001),
+		shape.Path(0.001, nil).Stroke(
 			DefaultStroke.
 				WithCaps(ButtCap).
 				WithDashes(0, []float64{0.1}),
 			StrokeOpts{},
-			0.01) {
-		}
+			0.01,
+			nil,
+		)
 	}
 }
 
@@ -54,8 +54,8 @@ func TestBrokenStrokes(t *testing.T) {
 	}
 	strokeStyle := DefaultStroke.WithWidth(30).WithCaps(ButtCap).WithJoin(MiterJoin)
 	for _, cubic := range brokenCubics {
-		path := CubicBez{cubic[0], cubic[1], cubic[2], cubic[3]}.PathElements(0.1)
-		stroked := BezPath(slices.Collect(StrokePath(path, strokeStyle, StrokeOpts{}, 0.001)))
+		path := CubicBez{cubic[0], cubic[1], cubic[2], cubic[3]}.Path(0.1, nil)
+		stroked := path.Stroke(strokeStyle, StrokeOpts{}, 0.001, nil)
 		if stroked.IsInf() {
 			t.Errorf("got infinite stroke for %v", cubic)
 		}
@@ -69,9 +69,9 @@ func TestPathologicalStroke(t *testing.T) {
 		Pt(562.963, 286.585),
 		Pt(562.963, 286.585),
 	}
-	path := curve.PathElements(0.1)
+	path := curve.Path(0.1, nil)
 	strokeStyle := DefaultStroke.WithWidth(1.0)
-	stroked := BezPath(slices.Collect(StrokePath(path, strokeStyle, StrokeOpts{}, 0.001)))
+	stroked := path.Stroke(strokeStyle, StrokeOpts{}, 0.001, nil)
 	if stroked.IsInf() {
 		t.Error("got infinite stroke")
 	}
@@ -86,8 +86,7 @@ func TestDashSequence(t *testing.T) {
 		Line{Pt(19.0, 0.0), Pt(21.0, 0.0)}.Seg(),
 		Line{Pt(0.0, 0.0), Pt(1.0, 0.0)}.Seg(),
 	}
-	it := Segments(Dash(shape.PathElements(0.0), 0.0, dashes))
-	got := slices.Collect(iter.Seq[PathSegment](it))
+	got := slices.Collect(shape.Path(0, nil).Dash(0.0, dashes, nil).Segments())
 	diff(t, want, got)
 }
 
@@ -101,7 +100,7 @@ func TestDashSequenceOffset(t *testing.T) {
 		Line{Pt(10.0, 0.0), Pt(11.0, 0.0)}.Seg(),
 		Line{Pt(16.0, 0.0), Pt(18.0, 0.0)}.Seg(),
 	}
-	it := Segments(Dash(shape.PathElements(0.0), 3.0, dashes))
+	it := shape.Path(0.0, nil).Dash(3.0, dashes, nil).Segments()
 	got := slices.Collect(iter.Seq[PathSegment](it))
 	diff(t, want, got)
 }
@@ -112,6 +111,6 @@ func TestStrokeWithMove(t *testing.T) {
 	p.LineTo(Pt(110., 506.))
 	p.CubicTo(Pt(135.887, 506.953), Pt(169.789, 478.352), Pt(149.129, 502.719))
 
-	for range StrokePath(p.Elements(), DefaultStroke, StrokeOpts{}, 0.1) {
+	for range p.Stroke(DefaultStroke, StrokeOpts{}, 0.1, nil) {
 	}
 }
