@@ -7,9 +7,9 @@ import (
 	"io"
 	"iter"
 	"log"
-	"os"
 	"slices"
 	"strings"
+	"time"
 )
 
 func main() {
@@ -49,23 +49,23 @@ func main() {
 		shift: shift,
 	}
 
-	v2 := v1.Update(13, 42)
+	v2 := v1.Update(21, 42)
 
-	v1.dot("v1", "v1", os.Stdout)
-	v2.dot("v2", "v2", os.Stdout)
+	const N = 1_000_000
 
-	// const N = 1_000_000
-
-	// {
-	// 	t := time.Now()
-	// 	for range N {
-	// 		for i := range 22 {
-	// 			_ = v1.Get(i)
-	// 		}
-	// 	}
-	// 	fmt.Println(float64(time.Since(t)) / (N * 22))
-	// }
+	{
+		t := time.Now()
+		for range 1 {
+			v1.EqualFunc(v2, func(i1, i2 int) bool {
+				log.Println(i1, i2)
+				return i1 == i2
+			})
+		}
+		fmt.Println(float64(time.Since(t)) / (N))
+	}
 }
+
+var Sink bool
 
 const (
 	maxSearchError = 2
@@ -120,11 +120,11 @@ func (v Vector[T]) EqualFunc(vo Vector[T], eq func(T, T) bool) bool {
 		)
 	}
 
-	// We have both equalLeafIter and equalIterLeaf to ensure that eq always
-	// gets called with v's elements as the first argument.
-	equalLeafIter := func(leaf *leafNode[T], inter *interiorNode[T]) bool {
+	if !okv {
+		// v.root is a leaf, vo.root is an interior node
+		leaf := v.root.(*leafNode[T])
 		i := 0
-		return inter.every(func(v T) bool {
+		return rootvo.every(func(v T) bool {
 			if i >= int(leaf.n) {
 				return false
 			}
@@ -132,10 +132,11 @@ func (v Vector[T]) EqualFunc(vo Vector[T], eq func(T, T) bool) bool {
 			i++
 			return b
 		})
-	}
-	equalIterLeaf := func(inter *interiorNode[T], leaf *leafNode[T]) bool {
+	} else if !okvo {
+		// v.root is an interior node, vo.root is a leaf
+		leaf := vo.root.(*leafNode[T])
 		i := 0
-		return inter.every(func(v T) bool {
+		return rootv.every(func(v T) bool {
 			if i >= int(leaf.n) {
 				return false
 			}
@@ -143,14 +144,6 @@ func (v Vector[T]) EqualFunc(vo Vector[T], eq func(T, T) bool) bool {
 			i++
 			return b
 		})
-	}
-
-	if !okv {
-		// v.root is a leaf, vo.root is an interior node
-		return equalLeafIter(v.root.(*leafNode[T]), rootvo)
-	} else if !okvo {
-		// v.root is an interior node, vo.root is a leaf
-		return equalIterLeaf(rootv, vo.root.(*leafNode[T]))
 	}
 
 	// Both roots are interior nodes.
@@ -164,7 +157,6 @@ outer:
 		cvo, okvo := pvo.current().(*leafNode[T])
 		if okv && okvo {
 			if pv.current() == pvo.current() {
-				log.Println("skipping identical leaves", pv.current())
 				bv := pv.next()
 				bvo := pvo.next()
 				if !bv && !bvo {
@@ -204,7 +196,6 @@ outer:
 		} else if !okv && !okvo {
 			if pv.current() == pvo.current() {
 				// Skip common subtree
-				log.Println("skipping common subtree", pv.current())
 				pv.ascend()
 				pvo.ascend()
 			}
@@ -230,7 +221,6 @@ outer:
 		}
 		for {
 			n := min(len(left), len(right))
-			log.Println("comparing", left[:n], right[:n])
 			if !slices.EqualFunc(left[:n], right[:n], eq) {
 				return false
 			}
@@ -360,22 +350,44 @@ func (v Vector[T]) EqualFuncStrict[TO any](vo Vector[TO], eq func(T, TO) bool) b
 		return false
 	}
 
-	next, cancel := iter.Pull(v.All())
+	if v.Length() == 0 {
+		return true
+	}
+
+	next, cancel := iter.Pull(v.leaves())
 	defer cancel()
-	nexto, cancelo := iter.Pull(vo.All())
+	nexto, cancelo := iter.Pull(vo.leaves())
 	defer cancelo()
 
+	nv, _ := next()
+	nvo, _ := nexto()
+
+	left := nv.values[:nv.n]
+	right := nvo.values[:nvo.n]
+
 	for {
-		a, oka := next()
-		b, okb := nexto()
-		if oka != okb {
+		n := min(len(left), len(right))
+		if !slices.EqualFunc(left[:n], right[:n], eq) {
 			return false
 		}
-		if !oka {
-			return true
+		left = left[n:]
+		right = right[n:]
+
+		if len(left) == 0 {
+			nv, ok := next()
+			if ok {
+				left = nv.values[:nv.n]
+			}
 		}
-		if !eq(a, b) {
-			return false
+		if len(right) == 0 {
+			nvo, ok := nexto()
+			if ok {
+				right = nvo.values[:nvo.n]
+			}
+		}
+
+		if len(left) == 0 {
+			return len(right) == 0
 		}
 	}
 }
@@ -469,19 +481,19 @@ func (v Vector[T]) Update(i int, value T) Vector[T] {
 			children: root.children, // this is a copy
 		}
 		parent := rootc
-		for slot, n := range root.traverse(uint(i), v.shift) {
+		for addr, n := range root.traverse(uint(i), v.shift) {
 			switch n := n.(type) {
 			case *interiorNode[T]:
 				nc := &interiorNode[T]{
 					cumSums:  n.cumSums,
 					children: n.children, // this is a copy
 				}
-				parent.children[slot] = nc
+				parent.children[addr.slot] = nc
 				parent = nc
 			case *leafNode[T]:
 				nc := *n
-				nc.values[slot] = value
-				parent.children[slot] = &nc
+				nc.values[addr.idx] = value
+				parent.children[addr.slot] = &nc
 			}
 		}
 
@@ -576,10 +588,15 @@ type interiorNode[T any] struct {
 	children [maxBranch]node[T]
 }
 
-func (n *interiorNode[T]) traverse(idx uint, shift uint8) iter.Seq2[uint8, node[T]] {
+type slotAndIndex struct {
+	slot uint8
+	idx  uint
+}
+
+func (n *interiorNode[T]) traverse(idx uint, shift uint8) iter.Seq2[slotAndIndex, node[T]] {
 	// Part of the reason why we return an iterator instead of accepting a
 	// callback is that iterators have more generous inlining budgets.
-	return func(yield func(uint8, node[T]) bool) {
+	return func(yield func(slotAndIndex, node[T]) bool) {
 		for {
 			slot := (idx >> shift) & (maxBranch - 1)
 			for slot < maxBranch && n.cumSums[slot] <= idx {
@@ -601,18 +618,11 @@ func (n *interiorNode[T]) traverse(idx uint, shift uint8) iter.Seq2[uint8, node[
 				n = n2.(*interiorNode[T])
 				// Decrease height by one
 				shift -= maxBranchExp
-				if !yield(uint8(slot), n) {
+				if !yield(slotAndIndex{uint8(slot), idx}, n) {
 					return
 				}
 			} else {
-				if idx >= maxBranch {
-					// unreachable for well-formed trees, but eliminates bounds checks.
-					return
-				}
-				n2 := n2.(*leafNode[T])
-				if !yield(uint8(idx), n2) {
-					return
-				}
+				yield(slotAndIndex{uint8(slot), idx}, n2)
 				return
 			}
 		}
@@ -620,9 +630,9 @@ func (n *interiorNode[T]) traverse(idx uint, shift uint8) iter.Seq2[uint8, node[
 }
 
 func (n *interiorNode[T]) index(idx uint, shift uint8) T {
-	for slot, n2 := range n.traverse(idx, shift) {
+	for addr, n2 := range n.traverse(idx, shift) {
 		if n, ok := n2.(*leafNode[T]); ok {
-			return n.values[slot]
+			return n.values[addr.idx]
 		}
 	}
 	// unreachable

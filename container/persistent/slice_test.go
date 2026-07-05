@@ -6,6 +6,110 @@ import (
 	"testing"
 )
 
+func makeSampleVector() Vector[int] {
+	n := &interiorNode[int]{
+		cumSums: &[maxBranch]uint{
+			14, 22, 22, 22,
+		},
+		children: [maxBranch]node[int]{
+			&interiorNode[int]{
+				cumSums: &[maxBranch]uint{
+					4, 7, 11, 14,
+				},
+				children: [maxBranch]node[int]{
+					&leafNode[int]{4, [maxBranch]int{0, 1, 2, 3}},
+					&leafNode[int]{3, [maxBranch]int{4, 5, 6}},
+					&leafNode[int]{4, [maxBranch]int{7, 8, 9, 10}},
+					&leafNode[int]{3, [maxBranch]int{11, 12, 13}},
+				},
+			},
+			&interiorNode[int]{
+				cumSums: &[maxBranch]uint{
+					3, 7, 8, 8,
+				},
+				children: [maxBranch]node[int]{
+					&leafNode[int]{3, [maxBranch]int{14, 15, 16}},
+					&leafNode[int]{4, [maxBranch]int{17, 18, 19, 20}},
+					&leafNode[int]{1, [maxBranch]int{21}},
+				},
+			},
+		},
+	}
+	const shift = 2 * maxBranchExp
+	return Vector[int]{
+		root:  n,
+		n:     22,
+		shift: shift,
+	}
+}
+
+func BenchmarkEqualFuncFirst(b *testing.B) {
+	v1 := makeSampleVector()
+	v2 := v1.Update(0, 42)
+	for b.Loop() {
+		v1.EqualFunc(v2, func(a, b int) bool { return a == b })
+	}
+}
+
+func BenchmarkEqualFuncLast(b *testing.B) {
+	v1 := makeSampleVector()
+	v2 := v1.Update(21, 42)
+	for b.Loop() {
+		v1.EqualFunc(v2, func(a, b int) bool { return a == b })
+	}
+}
+
+func BenchmarkEqualFuncIdentical(b *testing.B) {
+	v1 := makeSampleVector()
+	for b.Loop() {
+		v1.EqualFunc(v1, func(a, b int) bool { return a == b })
+	}
+}
+
+func BenchmarkEqualFuncStrictFirst(b *testing.B) {
+	v1 := makeSampleVector()
+	v2 := v1.Update(0, 42)
+	for b.Loop() {
+		v1.EqualFuncStrict(v2, func(a, b int) bool { return a == b })
+	}
+}
+
+func BenchmarkEqualFuncStrictLast(b *testing.B) {
+	v1 := makeSampleVector()
+	v2 := v1.Update(21, 42)
+	for b.Loop() {
+		v1.EqualFuncStrict(v2, func(a, b int) bool { return a == b })
+	}
+}
+
+func BenchmarkEqualFuncStrictIdentical(b *testing.B) {
+	v1 := makeSampleVector()
+	for b.Loop() {
+		v1.EqualFuncStrict(v1, func(a, b int) bool { return a == b })
+	}
+}
+
+func TestGet(t *testing.T) {
+	v := makeSampleVector()
+
+	for i := range 22 {
+		if got := v.Get(i); got != i {
+			t.Fatalf("v.Get(%d) = %d, want %d", i, got, i)
+		}
+	}
+}
+
+func TestUpdate(t *testing.T) {
+	v1 := makeSampleVector()
+	v2 := v1.Update(21, 42)
+
+	got := slices.Collect(v2.All())
+	want := []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 42}
+	if !slices.Equal(got, want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+}
+
 func TestEqualFunc(t *testing.T) {
 	a := &interiorNode[int]{}
 	b := &interiorNode[int]{}
@@ -37,9 +141,6 @@ func TestEqualFunc(t *testing.T) {
 	v1 := Vector[int]{
 		root: x,
 	}
-
-	fmt.Println(slices.Collect(v0.All()))
-	fmt.Println(slices.Collect(v1.All()))
 
 	if !v0.EqualFunc(v1, func(l int, r int) bool {
 		return l == r
