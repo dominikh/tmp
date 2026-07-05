@@ -153,21 +153,29 @@ func (v Vector[T]) EqualFunc(vo Vector[T], eq func(T, T) bool) bool {
 	var left, right []T
 outer:
 	for {
+		bv := pv.next()
+		bvo := pvo.next()
+		if bv != bvo {
+			return false
+		}
+		if !bv {
+			return true
+		}
+
+		if pv.current() == pvo.current() {
+			// Skip common subtree
+			pv.ascend()
+			pvo.ascend()
+			continue outer
+		}
+
 		cv, okv := pv.current().(*leafNode[T])
 		cvo, okvo := pvo.current().(*leafNode[T])
-		if okv && okvo {
-			if pv.current() == pvo.current() {
-				bv := pv.next()
-				bvo := pvo.next()
-				if !bv && !bvo {
-					return true
-				}
-				continue outer
-			} else {
-				left = cv.values[:cv.n]
-				right = cvo.values[:cvo.n]
-			}
-		} else if okv && !okvo {
+		switch {
+		case okv && okvo:
+			left = cv.values[:cv.n]
+			right = cvo.values[:cvo.n]
+		case okv && !okvo:
 			left = cv.values[:cv.n]
 
 			// Advance pvo until it hits a leaf
@@ -180,7 +188,7 @@ outer:
 					break
 				}
 			}
-		} else if !okv && okvo {
+		case !okv && okvo:
 			right = cvo.values[:cvo.n]
 
 			// Advance pv until it hits a leaf
@@ -193,20 +201,7 @@ outer:
 					break
 				}
 			}
-		} else if !okv && !okvo {
-			if pv.current() == pvo.current() {
-				// Skip common subtree
-				pv.ascend()
-				pvo.ascend()
-			}
-			bv := pv.next()
-			bvo := pvo.next()
-			if bv != bvo {
-				return false
-			}
-			if !bv {
-				return true
-			}
+		case !okv && !okvo:
 			continue outer
 		}
 
