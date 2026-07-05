@@ -43,6 +43,24 @@ func makeSampleVector() Vector[int] {
 	}
 }
 
+func BenchmarkAppendPop(b *testing.B) {
+	values := make([]int, maxBranch-1)
+	v := NewVector(values)
+	for b.Loop() {
+		v2 := v.Append(0)
+		_ = v2.Pop()
+	}
+}
+
+func BenchmarkAppendPopStraddle(b *testing.B) {
+	values := make([]int, maxBranch)
+	v := NewVector(values)
+	for b.Loop() {
+		v2 := v.Append(0)
+		_ = v2.Pop()
+	}
+}
+
 func BenchmarkEqualFuncFirst(b *testing.B) {
 	v1 := makeSampleVector()
 	v2 := v1.Update(0, 42)

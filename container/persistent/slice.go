@@ -13,7 +13,7 @@ import (
 
 const (
 	maxSearchError = 2
-	maxBranchExp   = 2 // 2 during debugging, 5 in production
+	maxBranchExp   = 5 // 2 during debugging, 5 in production
 
 	// maxBranch must be 2**maxBranchExp.
 	maxBranch = 1 << maxBranchExp
@@ -23,6 +23,9 @@ var _ [maxSearchError]struct{} // maxSearchError >= 0
 
 type Vector[T any] struct {
 	root node[T]
+	// tail points to the trailing elements of the vector. It is nil iff the
+	// vector is empty.
+	tail *leafNode[T]
 	n    uint
 	// shift is maxBranchExp * height. A vector of height h can store up to
 	// maxBranch<<shift (= maxBranch * 2**shift = 2**(maxBranchExp*(h+1))
@@ -69,6 +72,13 @@ func buildTrie[T any](elems []T, shift int) node[T] {
 	}
 
 	return n
+}
+
+func (v Vector[T]) tailOffset() uint {
+	if v.tail == nil {
+		return 0
+	}
+	return v.n - uint(v.tail.n)
 }
 
 func (v Vector[T]) Append(value T) Vector[T] {
@@ -561,12 +571,9 @@ func (v Vector[T]) Update(i int, value T) Vector[T] {
 		for addr, n := range root.traverse(uint(i), v.shift) {
 			switch n := n.(type) {
 			case *interiorNode[T]:
-				nc := &interiorNode[T]{
-					cumSums:  n.cumSums,
-					children: n.children, // this is a copy
-				}
-				parent.children[addr.slot] = nc
-				parent = nc
+				nc := *n
+				parent.children[addr.slot] = &nc
+				parent = &nc
 			case *leafNode[T]:
 				nc := *n
 				nc.values[addr.idx] = value
