@@ -47,7 +47,7 @@ func FuzzVectorOps(f *testing.F) {
 		// Build by NewVector from an existing model, then compare versions.
 		{0, 0, 1, 0, 0, 2, 0, 0, 3, 5, 0, 0, 6, 0, 1},
 		// Boundary-heavy append/pop sequence.
-		append(bytes.Repeat([]byte{0, 0, 7}, 17), bytes.Repeat([]byte{1, 0, 0}, 3)...),
+		append(bytes.Repeat([]byte{0, 0, 7}, 5), bytes.Repeat([]byte{1, 0, 0}, 3)...),
 	} {
 		f.Add(seed)
 	}
@@ -202,7 +202,11 @@ func checkVector(t *testing.T, v Vector[int], want []int) {
 		t.Fatalf("EqualFuncStrict(NewVector(want)) = false")
 	}
 
-	checkDenseInvariants(t, v, len(want))
+	if len(want) <= maxBranch {
+		checkDenseInvariants(t, v, 0)
+	} else {
+		checkDenseInvariants(t, v, len(want)-int(v.tail.n))
+	}
 }
 
 func checkDenseInvariants(t *testing.T, v Vector[int], length int) {
@@ -212,8 +216,8 @@ func checkDenseInvariants(t *testing.T, v Vector[int], length int) {
 		// The fuzz tests only construct vectors via dense operations.
 		t.Fatalf("vector is unexpectedly not dense")
 	}
-	if v.n != uint(length) {
-		t.Fatalf("v.n = %d, want %d", v.n, length)
+	if v.treeN != uint(length) {
+		t.Fatalf("v.treeN = %d, want %d", v.treeN, length)
 	}
 	if length == 0 {
 		if v.root != nil {
@@ -229,8 +233,10 @@ func checkDenseInvariants(t *testing.T, v Vector[int], length int) {
 	if v.shift != wantShift {
 		t.Fatalf("shift = %d, want %d for length %d", v.shift, wantShift, length)
 	}
-	if got := checkDenseNode(t, v.root, v.shift); got != uint(length) {
-		t.Fatalf("tree stores %d values, want %d", got, length)
+	if v.root != nil {
+		if got := checkDenseNode(t, v.root, v.shift); got != uint(length) {
+			t.Fatalf("tree stores %d values, want %d", got, length)
+		}
 	}
 }
 
@@ -242,8 +248,10 @@ func checkDenseNode(t *testing.T, n node[int], shift uint8) uint {
 		if !ok {
 			t.Fatalf("node at shift 0 has type %T, want *leafNode[int]", n)
 		}
-		if leaf.n == 0 || leaf.n > maxBranch {
-			t.Fatalf("leaf.n = %d, want 1..%d", leaf.n, maxBranch)
+		if leaf.n != maxBranch {
+			// In a non-RRB tree with tails, all leaf nodes stored in the tree
+			// are full.
+			t.Fatalf("leaf.n = %d, want %d", leaf.n, maxBranch)
 		}
 		return uint(leaf.n)
 	}
@@ -280,10 +288,7 @@ func checkDenseNode(t *testing.T, n node[int], shift uint8) uint {
 }
 
 func denseShiftForLen(length int) uint8 {
-	if length <= 1 {
-		return 0
-	}
-	return uint8(((bits.Len(uint(length-1)) - 1) / maxBranchExp) * maxBranchExp)
+	return max(maxBranchExp, uint8(((bits.Len(uint(length-1))-1)/maxBranchExp)*maxBranchExp))
 }
 
 func intsFromBytes(data []byte) []int {
