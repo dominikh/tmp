@@ -1,32 +1,19 @@
 //go:build go1.27
 
-package main
+package persistent
 
 import (
 	"fmt"
 	"io"
 	"iter"
-	"log"
 	"math/bits"
 	"slices"
 	"strings"
-	"time"
 )
-
-func main() {
-	t := time.Now()
-	for range 1_000_000 {
-		v := NewVector[int](nil)
-		for i := range 128 {
-			v = v.Append(10 + i)
-		}
-	}
-	log.Println(float64(time.Since(t)) / 1_000_000)
-}
 
 const (
 	maxSearchError = 2
-	maxBranchExp   = 5 // 2 during debugging, 5 in production
+	maxBranchExp   = 2 // 2 during debugging, 5 in production
 
 	// maxBranch must be 2**maxBranchExp.
 	maxBranch = 1 << maxBranchExp
@@ -36,8 +23,11 @@ var _ [maxSearchError]struct{} // maxSearchError >= 0
 
 type Vector[T any] struct {
 	root node[T]
-	n    int
-	// shift is maxBranchExp * height
+	n    uint
+	// shift is maxBranchExp * height. A vector of height h can store up to
+	// maxBranch<<shift (= maxBranch * 2**shift = 2**(maxBranchExp*(h+1))
+	// elements. h is zero-based, a vector with a single leaf node has height
+	// 0.
 	shift uint8
 	// rrb is true once concatenation or left slicing has occurred and the
 	// vector can no longer be assumed to be leftwise dense.
@@ -56,7 +46,7 @@ func NewVector[T any](elems []T) Vector[T] {
 	}
 
 	return Vector[T]{
-		n:     len(elems),
+		n:     uint(len(elems)),
 		root:  buildTrie(elems, shift),
 		shift: uint8(shift),
 	}
@@ -106,7 +96,7 @@ func (v Vector[T]) Append(value T) Vector[T] {
 		} else {
 			t := vc.root
 			for shift := vc.shift; shift >= maxBranchExp; shift -= maxBranchExp {
-				i := (v.n >> shift) & (maxBranch - 1)
+				i := (v.n >> shift) % maxBranch
 				child := cloneNode(t.(*interiorNode[T]).children[i])
 				if child == nil {
 					if shift == maxBranchExp {
@@ -119,13 +109,65 @@ func (v Vector[T]) Append(value T) Vector[T] {
 				t.(*interiorNode[T]).children[i] = child
 				t = child
 			}
-			i := v.n & (maxBranch - 1)
+			i := v.n % maxBranch
 			t.(*leafNode[T]).values[i] = value
 			t.(*leafNode[T]).n++
 			return vc
 		}
 	} else {
 		// XXX implement as a concatenation
+		return Vector[T]{}
+	}
+}
+
+func (v Vector[T]) Pop() Vector[T] {
+	if v.n == 0 {
+		panic("tried to pop from empty vector")
+	}
+
+	if v.n == 1 {
+		return Vector[T]{}
+	}
+
+	if !v.rrb {
+		vc := v
+		vc.n--
+		if v.shift > 0 && vc.n == 1<<v.shift {
+			// After popping, the vector is fully dense. This implies that the
+			// current root has two children and that the entire right arm of
+			// the tree can be popped, because it only stores a single value.
+			vc.shift -= maxBranchExp
+			vc.root = v.root.(*interiorNode[T]).children[0]
+			return vc
+		} else {
+			vc.root = cloneNode(v.root)
+			t := node[T](vc.root)
+			for shift := vc.shift; ; shift -= maxBranchExp {
+				ic := (vc.n >> shift) % maxBranch
+				if vc.n%(1<<shift) == 0 {
+					switch t := t.(type) {
+					case *interiorNode[T]:
+						// The index to delete is the first index in subtree
+						// t.children[ic]. Because the index is also the last index
+						// in the vector, the subtree cannot have any other
+						// children, which means we can drop it.
+						t.n--
+						t.children[ic] = nil
+					case *leafNode[T]:
+						t.n--
+						t.values[ic] = *new(T)
+					default:
+						panic("unreachable")
+					}
+					return vc
+				}
+				t_ := t.(*interiorNode[T])
+				t_.children[ic] = cloneNode(t_.children[ic])
+				t = t_.children[ic]
+			}
+		}
+	} else {
+		// XXX implement
 		return Vector[T]{}
 	}
 }
@@ -456,19 +498,22 @@ func (v Vector[T]) leaves() iter.Seq[*leafNode[T]] {
 	switch root := v.root.(type) {
 	case *interiorNode[T]:
 		return func(yield func(*leafNode[T]) bool) {
-			var dfs func(node *interiorNode[T])
-			dfs = func(node *interiorNode[T]) {
+			var dfs func(node *interiorNode[T]) bool
+			dfs = func(node *interiorNode[T]) bool {
 				for _, child := range node.children {
 					switch child := child.(type) {
 					case *interiorNode[T]:
-						dfs(child)
+						if !dfs(child) {
+							return false
+						}
 					case *leafNode[T]:
 						if !yield(child) {
-							return
+							return false
 						}
 					case nil:
 					}
 				}
+				return true
 			}
 			dfs(root)
 		}
@@ -485,7 +530,7 @@ func (v Vector[T]) Get(idx int) T {
 	if idx < 0 {
 		panic(fmt.Sprintf("index out of range [%d]", idx))
 	}
-	if idx >= v.n {
+	if uint(idx) >= v.n {
 		panic(fmt.Sprintf("index out of range [%d] with length %d", idx, v.n))
 	}
 
@@ -505,17 +550,14 @@ func (v Vector[T]) Update(i int, value T) Vector[T] {
 	if i < 0 {
 		panic(fmt.Sprintf("index out of range [%d]", i))
 	}
-	if i >= v.n {
+	if uint(i) >= v.n {
 		panic(fmt.Sprintf("index out of range [%d] with length %d", i, v.n))
 	}
 
 	switch root := v.root.(type) {
 	case *interiorNode[T]:
-		rootc := &interiorNode[T]{
-			cumSums:  root.cumSums,
-			children: root.children, // this is a copy
-		}
-		parent := rootc
+		rootc := *root
+		parent := &rootc
 		for addr, n := range root.traverse(uint(i), v.shift) {
 			switch n := n.(type) {
 			case *interiorNode[T]:
@@ -533,7 +575,7 @@ func (v Vector[T]) Update(i int, value T) Vector[T] {
 		}
 
 		return Vector[T]{
-			root:  rootc,
+			root:  &rootc,
 			n:     v.n,
 			shift: v.shift,
 		}
@@ -550,6 +592,7 @@ func (v Vector[T]) Update(i int, value T) Vector[T] {
 	}
 }
 
+//lint:ignore U1000 Debug helper
 func (v Vector[T]) dot(name string, w io.Writer) {
 	fmt.Fprintln(w, "strict digraph {")
 	fmt.Fprintf(w, "v%s [label=%q, shape=box];\n", name, name)
@@ -650,7 +693,7 @@ func (n *interiorNode[T]) traverse(idx uint, shift uint8) iter.Seq2[slotAndIndex
 	// callback is that iterators have more generous inlining budgets.
 	return func(yield func(slotAndIndex, node[T]) bool) {
 		for {
-			slot := (idx >> shift) & (maxBranch - 1)
+			slot := (idx >> shift) % maxBranch
 			if n.cumSums != nil {
 				for slot < maxBranch && n.cumSums[slot] <= idx {
 					slot++
@@ -663,7 +706,7 @@ func (n *interiorNode[T]) traverse(idx uint, shift uint8) iter.Seq2[slotAndIndex
 					idx -= n.cumSums[slot-1]
 				}
 			} else {
-				idx -= slot * maxBranch
+				idx -= slot << shift
 			}
 
 			n2 := n.children[slot]
