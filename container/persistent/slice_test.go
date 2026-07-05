@@ -1,0 +1,151 @@
+package main
+
+import (
+	"fmt"
+	"slices"
+	"testing"
+)
+
+func TestEqualFunc(t *testing.T) {
+	a := &interiorNode[int]{}
+	b := &interiorNode[int]{}
+	c := &interiorNode[int]{}
+
+	l0 := &leafNode[int]{n: 2, values: [maxBranch]int{1, 2}}
+	l1 := &leafNode[int]{n: 2, values: [maxBranch]int{3, 4}}
+	l2 := &leafNode[int]{n: 2, values: [maxBranch]int{5, 6}}
+	l3 := &leafNode[int]{n: 2, values: [maxBranch]int{7, 8}}
+
+	a.children = [maxBranch]node[int]{b, c}
+	b.children = [maxBranch]node[int]{l0, l1}
+	c.children = [maxBranch]node[int]{l2, l3}
+
+	x := &interiorNode[int]{}
+	y := &interiorNode[int]{}
+	z := &interiorNode[int]{}
+
+	l4 := &leafNode[int]{n: 3, values: [maxBranch]int{1, 2, 3}}
+	l5 := &leafNode[int]{n: 1, values: [maxBranch]int{4}}
+
+	x.children = [maxBranch]node[int]{y}
+	y.children = [maxBranch]node[int]{z, c}
+	z.children = [maxBranch]node[int]{l4, l5}
+
+	v0 := Vector[int]{
+		root: a,
+	}
+	v1 := Vector[int]{
+		root: x,
+	}
+
+	fmt.Println(slices.Collect(v0.All()))
+	fmt.Println(slices.Collect(v1.All()))
+
+	if !v0.EqualFunc(v1, func(l int, r int) bool {
+		return l == r
+	}) {
+		t.Fatalf("vectors did not compare equal")
+	}
+}
+
+func TestPreorder(t *testing.T) {
+	a := &interiorNode[int]{}
+	b := &interiorNode[int]{}
+	c := &interiorNode[int]{}
+	d := &interiorNode[int]{}
+	e := &interiorNode[int]{}
+	f := &interiorNode[int]{}
+	g := &interiorNode[int]{}
+
+	l0 := &leafNode[int]{}
+	l1 := &leafNode[int]{}
+	l2 := &leafNode[int]{}
+	l3 := &leafNode[int]{}
+
+	a.children = [maxBranch]node[int]{b, c, nil, d}
+	b.children = [maxBranch]node[int]{e}
+	c.children = [maxBranch]node[int]{f, g}
+	d.children = [maxBranch]node[int]{l3}
+	e.children = [maxBranch]node[int]{l0}
+	f.children = [maxBranch]node[int]{l1}
+	g.children = [maxBranch]node[int]{l2}
+
+	names := map[node[int]]string{
+		a:  "a",
+		b:  "b",
+		c:  "c",
+		d:  "d",
+		e:  "e",
+		f:  "f",
+		g:  "g",
+		l0: "l0",
+		l1: "l1",
+		l2: "l2",
+		l3: "l3",
+	}
+
+	// First we test that a simple preorder traversal without skips yields
+	// nodes in the expected order.
+
+	log := []node[int]{
+		a, b, e, l0, c, f, l1, g, l2, d, l3,
+	}
+	p := newPreorder(a)
+	for i := range len(log) {
+		cur := p.current()
+		if cur != log[i] {
+			got, ok := names[cur]
+			if !ok {
+				got = fmt.Sprintf("%p", cur)
+			}
+			want, ok := names[log[i]]
+			if !ok {
+				got = fmt.Sprintf("%p", log[i])
+			}
+			t.Fatalf("#%d: p.current() == %s, want %s", i, got, want)
+		}
+		if i < len(log)-1 {
+			if !p.next() {
+				t.Fatalf("#%d: p.next() returned false", i)
+			}
+		} else {
+			if p.next() {
+				t.Fatalf("#%d: p.next() returned true", i)
+			}
+		}
+	}
+
+	// Next we test that we can skip the children of c
+	log = []node[int]{
+		a, b, e, l0, c, d, l3,
+	}
+	p = newPreorder(a)
+	for i := range len(log) {
+		cur := p.current()
+		if cur != log[i] {
+			got, ok := names[cur]
+			if !ok {
+				got = fmt.Sprintf("%p", cur)
+			}
+			want, ok := names[log[i]]
+			if !ok {
+				got = fmt.Sprintf("%p", log[i])
+			}
+			t.Fatalf("#%d: p.current() == %s, want %s", i, got, want)
+		}
+		if cur == c {
+			p.ascend()
+			p.next()
+			continue
+		}
+		if i < len(log)-1 {
+			if !p.next() {
+				t.Fatalf("#%d: p.next() returned false", i)
+			}
+		} else {
+			if p.next() {
+				t.Fatalf("#%d: p.next() returned true", i)
+			}
+		}
+	}
+}
