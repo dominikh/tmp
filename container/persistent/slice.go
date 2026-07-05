@@ -7,69 +7,26 @@ import (
 	"io"
 	"iter"
 	"log"
+	"math/bits"
 	"slices"
 	"strings"
 	"time"
 )
 
 func main() {
-	n := &interiorNode[int]{
-		cumSums: &[maxBranch]uint{
-			14, 22, 22, 22,
-		},
-		children: [maxBranch]node[int]{
-			&interiorNode[int]{
-				cumSums: &[maxBranch]uint{
-					4, 7, 11, 14,
-				},
-				children: [maxBranch]node[int]{
-					&leafNode[int]{4, [maxBranch]int{0, 1, 2, 3}},
-					&leafNode[int]{3, [maxBranch]int{4, 5, 6}},
-					&leafNode[int]{4, [maxBranch]int{7, 8, 9, 10}},
-					&leafNode[int]{3, [maxBranch]int{11, 12, 13}},
-				},
-			},
-			&interiorNode[int]{
-				cumSums: &[maxBranch]uint{
-					3, 7, 8, 8,
-				},
-				children: [maxBranch]node[int]{
-					&leafNode[int]{3, [maxBranch]int{14, 15, 16}},
-					&leafNode[int]{4, [maxBranch]int{17, 18, 19, 20}},
-					&leafNode[int]{1, [maxBranch]int{21}},
-				},
-			},
-		},
-	}
-	const shift = 2 * maxBranchExp
-
-	v1 := Vector[int]{
-		root:  n,
-		n:     22,
-		shift: shift,
-	}
-
-	v2 := v1.Update(21, 42)
-
-	const N = 1_000_000
-
-	{
-		t := time.Now()
-		for range 1 {
-			v1.EqualFunc(v2, func(i1, i2 int) bool {
-				log.Println(i1, i2)
-				return i1 == i2
-			})
+	t := time.Now()
+	for range 1_000_000 {
+		v := NewVector[int](nil)
+		for i := range 128 {
+			v = v.Append(10 + i)
 		}
-		fmt.Println(float64(time.Since(t)) / (N))
 	}
+	log.Println(float64(time.Since(t)) / 1_000_000)
 }
-
-var Sink bool
 
 const (
 	maxSearchError = 2
-	maxBranchExp   = 2 // 2 during debugging, 5 in production
+	maxBranchExp   = 5 // 2 during debugging, 5 in production
 
 	// maxBranch must be 2**maxBranchExp.
 	maxBranch = 1 << maxBranchExp
@@ -82,6 +39,95 @@ type Vector[T any] struct {
 	n    int
 	// shift is maxBranchExp * height
 	shift uint8
+	// rrb is true once concatenation or left slicing has occurred and the
+	// vector can no longer be assumed to be leftwise dense.
+	rrb bool
+}
+
+func NewVector[T any](elems []T) Vector[T] {
+	if len(elems) == 0 {
+		return Vector[T]{}
+	}
+
+	var shift int
+	if len(elems) > 1 {
+		// Highest index is n-1. Each trie level consumes maxBranchExp bits.
+		shift = ((bits.Len(uint(len(elems)-1)) - 1) / maxBranchExp) * maxBranchExp
+	}
+
+	return Vector[T]{
+		n:     len(elems),
+		root:  buildTrie(elems, shift),
+		shift: uint8(shift),
+	}
+}
+
+func buildTrie[T any](elems []T, shift int) node[T] {
+	if shift == 0 {
+		leaf := &leafNode[T]{n: uint8(len(elems))}
+		copy(leaf.values[:], elems)
+		return leaf
+	}
+
+	childWidth := 1 << shift
+
+	n := &interiorNode[T]{}
+	for i := 0; i < len(elems); i += childWidth {
+		end := min(i+childWidth, len(elems))
+		n.children[n.n] = buildTrie(elems[i:end], shift-maxBranchExp)
+		n.n++
+	}
+
+	return n
+}
+
+func (v Vector[T]) Append(value T) Vector[T] {
+	if !v.rrb {
+		// Fast path
+		full := maxBranch<<v.shift == v.n
+		vc := v
+		vc.n++
+		if full {
+			vc.root = &interiorNode[T]{
+				n:        1,
+				children: [maxBranch]node[T]{v.root},
+			}
+			vc.shift += maxBranchExp
+		} else {
+			vc.root = cloneNode(v.root)
+		}
+
+		if vc.root == nil {
+			vc.root = &leafNode[T]{
+				n:      1,
+				values: [maxBranch]T{value},
+			}
+			return vc
+		} else {
+			t := vc.root
+			for shift := vc.shift; shift >= maxBranchExp; shift -= maxBranchExp {
+				i := (v.n >> shift) & (maxBranch - 1)
+				child := cloneNode(t.(*interiorNode[T]).children[i])
+				if child == nil {
+					if shift == maxBranchExp {
+						child = &leafNode[T]{}
+					} else {
+						child = &interiorNode[T]{}
+					}
+					t.(*interiorNode[T]).n++
+				}
+				t.(*interiorNode[T]).children[i] = child
+				t = child
+			}
+			i := v.n & (maxBranch - 1)
+			t.(*leafNode[T]).values[i] = value
+			t.(*leafNode[T]).n++
+			return vc
+		}
+	} else {
+		// XXX implement as a concatenation
+		return Vector[T]{}
+	}
 }
 
 // EqualFunc reports whether two vectors are equal. If the lengths are
@@ -171,11 +217,10 @@ outer:
 
 		cv, okv := pv.current().(*leafNode[T])
 		cvo, okvo := pvo.current().(*leafNode[T])
-		switch {
-		case okv && okvo:
+		if okv && okvo {
 			left = cv.values[:cv.n]
 			right = cvo.values[:cvo.n]
-		case okv && !okvo:
+		} else if okv && !okvo {
 			left = cv.values[:cv.n]
 
 			// Advance pvo until it hits a leaf
@@ -188,7 +233,7 @@ outer:
 					break
 				}
 			}
-		case !okv && okvo:
+		} else if !okv && okvo {
 			right = cvo.values[:cvo.n]
 
 			// Advance pv until it hits a leaf
@@ -201,13 +246,10 @@ outer:
 					break
 				}
 			}
-		case !okv && !okvo:
+		} else if !okv && !okvo {
 			continue outer
 		}
 
-		// Both are leaves. Compare and consume the shorter prefix, advance
-		// the other side to the next leaf. If both leaves have been fully
-		// consumed. advance both sides.
 		if len(left) == 0 {
 			panic("internal error: left side is empty")
 		}
@@ -222,11 +264,6 @@ outer:
 			left = left[n:]
 			right = right[n:]
 			if len(left) == 0 && len(right) == 0 {
-				bv := pv.next()
-				bvo := pvo.next()
-				if !bv && !bvo {
-					return true
-				}
 				continue outer
 			} else if len(left) == 0 {
 				// Advance pv until it hits a leaf
@@ -271,6 +308,9 @@ type preorder[T any] struct {
 }
 
 func (p *preorder[T]) current() node[T] {
+	// OPT(dh): instead of all this logic, set a field when the current node
+	// changes.
+
 	n := p.stack[len(p.stack)-1]
 	if n.curChildIdx == -1 {
 		return n.node
@@ -510,9 +550,9 @@ func (v Vector[T]) Update(i int, value T) Vector[T] {
 	}
 }
 
-func (v Vector[T]) dot(name, desc string, w io.Writer) {
+func (v Vector[T]) dot(name string, w io.Writer) {
 	fmt.Fprintln(w, "strict digraph {")
-	fmt.Fprintf(w, "v%s [label=%q, shape=box];\n", name, desc)
+	fmt.Fprintf(w, "v%s [label=%q, shape=box];\n", name, name)
 	var dfs func(pid string, n node[T])
 	dfs = func(pid string, n node[T]) {
 		switch n := n.(type) {
@@ -550,6 +590,21 @@ type node[T any] interface {
 	every(f func(T) bool) bool
 }
 
+func cloneNode[T any](n node[T]) node[T] {
+	switch n := n.(type) {
+	case *leafNode[T]:
+		nc := *n
+		return &nc
+	case *interiorNode[T]:
+		nc := *n
+		return &nc
+	case nil:
+		return nil
+	default:
+		panic("unreachable")
+	}
+}
+
 type leafNode[T any] struct {
 	// n stores the number of populated values. This is redundant with the leaf
 	// node's parent (either an interiorNode or a Vector), but simplifies
@@ -573,7 +628,8 @@ func (n *leafNode[T]) every(f func(T) bool) bool {
 
 type interiorNode[T any] struct {
 	// The number of values accessible via a branch. Not stored directly so
-	// they can be reused between nodes.
+	// they can be reused between nodes. Nil when all children are leftwise
+	// dense.
 	cumSums *[maxBranch]uint
 	// children are either *[interiorNode] or *[leafNode].
 	//
@@ -581,6 +637,7 @@ type interiorNode[T any] struct {
 	// some storage and some instructions on use. We can infer the type from
 	// the node's level. Of course it'd be a lot less safe.
 	children [maxBranch]node[T]
+	n        uint8
 }
 
 type slotAndIndex struct {
@@ -594,15 +651,19 @@ func (n *interiorNode[T]) traverse(idx uint, shift uint8) iter.Seq2[slotAndIndex
 	return func(yield func(slotAndIndex, node[T]) bool) {
 		for {
 			slot := (idx >> shift) & (maxBranch - 1)
-			for slot < maxBranch && n.cumSums[slot] <= idx {
-				slot++
-			}
-			if slot >= maxBranch {
-				// unreachable for well-formed trees, but eliminates bounds checks.
-				return
-			}
-			if slot > 0 {
-				idx -= n.cumSums[slot-1]
+			if n.cumSums != nil {
+				for slot < maxBranch && n.cumSums[slot] <= idx {
+					slot++
+				}
+				if slot >= maxBranch {
+					// unreachable for well-formed trees, but eliminates bounds checks.
+					return
+				}
+				if slot > 0 {
+					idx -= n.cumSums[slot-1]
+				}
+			} else {
+				idx -= slot * maxBranch
 			}
 
 			n2 := n.children[slot]
