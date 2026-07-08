@@ -9,6 +9,18 @@ import (
 	"testing"
 )
 
+func log(t *testing.T, v ...any) {
+	if testing.Verbose() {
+		t.Log(v...)
+	}
+}
+
+func logf(t *testing.T, f string, v ...any) {
+	if testing.Verbose() {
+		t.Logf(f, v...)
+	}
+}
+
 func FuzzNewVectorRoundTrip(f *testing.F) {
 	for _, seed := range [][]byte{
 		nil,
@@ -79,10 +91,12 @@ func FuzzVectorOps(f *testing.F) {
 				versions = append(versions, v)
 				models = append(models, slices.Clone(model))
 				current = len(versions) - 1
+				logf(t, "add %v as version %d, make current", model, current)
 				return
 			}
 
 			current = int(selector) % maxVersions
+			logf(t, "add %v as version %d, make current", model, current)
 			versions[current] = v
 			models[current] = slices.Clone(model)
 		}
@@ -93,17 +107,21 @@ func FuzzVectorOps(f *testing.F) {
 			arg := next()
 
 			base := current
+			log(t, "base is", current)
 			if selector != 0 {
 				base = int(selector) % len(versions)
+				log(t, "select base", base)
 			}
 			v := versions[base]
 			model := models[base]
+			log(t, "model is", model)
 
 			switch op % 7 {
 			case 0: // Append to an arbitrary existing version.
 				if len(model) >= maxLen {
 					continue
 				}
+				log(t, "append", arg)
 				model2 := append(slices.Clone(model), int(arg))
 				v2 := v.Append(int(arg))
 				checkVector(t, v, model) // persistence: the base version is unchanged
@@ -114,7 +132,11 @@ func FuzzVectorOps(f *testing.F) {
 					continue
 				}
 				model2 := slices.Clone(model[:len(model)-1])
+				log(t, "pop")
 				v2 := v.Pop()
+				if v2.Length() != v.Length()-1 {
+					t.Fatalf("%d != %d - 1", v2.Length(), v.Length())
+				}
 				checkVector(t, v, model)
 				addVersion(v2, model2, selector)
 
@@ -124,6 +146,7 @@ func FuzzVectorOps(f *testing.F) {
 				}
 				idx := int(arg) % len(model)
 				value := int(next())
+				log(t, "update", idx, value)
 				model2 := slices.Clone(model)
 				model2[idx] = value
 				v2 := v.Update(idx, value)
@@ -135,27 +158,33 @@ func FuzzVectorOps(f *testing.F) {
 					continue
 				}
 				idx := int(arg) % len(model)
+				log(t, "get", idx)
 				if got := v.Get(idx); got != model[idx] {
 					t.Fatalf("Get(%d) = %d, want %d", idx, got, model[idx])
 				}
 
 			case 4: // Switch current version.
 				current = base
+				log(t, "swap current and base")
 				checkVector(t, versions[current], models[current])
 
 			case 5: // Rebuild current model via NewVector, creating a different shape/history.
 				v2 := NewVector(slices.Clone(model))
+				log(t, "rebuild")
 				checkVector(t, v, model)
 				addVersion(v2, model, selector)
 
 			case 6: // Compare two arbitrary versions.
 				other := int(arg) % len(versions)
+				log(t, "compare base and", other)
 				want := slices.Equal(models[base], models[other])
 				if got := versions[base].EqualFunc(versions[other], intEqual); got != want {
-					t.Fatalf("EqualFunc(%d, %d) = %v, want %v", base, other, got, want)
+					t.Fatalf("EqualFunc(%s, %s) = %v, want %v",
+						versions[base], versions[other], got, want)
 				}
 				if got := versions[base].EqualFuncStrict(versions[other], intEqual); got != want {
-					t.Fatalf("EqualFuncStrict(%d, %d) = %v, want %v", base, other, got, want)
+					t.Fatalf("EqualFuncStrict(%s, %s) = %v, want %v",
+						versions[base], versions[other], got, want)
 				}
 			}
 		}
@@ -173,7 +202,12 @@ func checkVector(t *testing.T, v Vector[int], want []int) {
 		t.Fatalf("Length() = %d, want %d", got, len(want))
 	}
 
-	if got := slices.Collect(v.All()); !slices.Equal(got, want) {
+	collected := slices.Collect(v.All())
+	if v.Length() != len(collected) {
+		t.Fatalf("Vector of length %d returned %d values from All",
+			v.Length(), len(collected))
+	}
+	if got := collected; !slices.Equal(got, want) {
 		t.Fatalf("All() = %v, want %v", got, want)
 	}
 

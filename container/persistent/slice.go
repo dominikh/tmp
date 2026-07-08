@@ -13,7 +13,7 @@ import (
 
 const (
 	maxSearchError = 2
-	maxBranchExp   = 5 // 2 during debugging, 5 in production
+	maxBranchExp   = 2 // 2 during debugging, 5 in production
 
 	// maxBranch must be 2**maxBranchExp.
 	maxBranch = 1 << maxBranchExp
@@ -262,6 +262,7 @@ func (v Vector[T]) Pop() Vector[T] {
 				}
 			} else {
 				// Only the tail is left
+				vc.root = nil
 				vc.metadata = shiftAndTreeN(0, 0)
 			}
 			return vc
@@ -319,19 +320,23 @@ func (v Vector[T]) EqualFunc(vo Vector[T], eq func(T, T) bool) bool {
 
 	// Both roots are interior nodes.
 	pv := newPreorder(v.root, v.tail)
-	pvo := newPreorder(vo.root, v.tail)
+	pvo := newPreorder(vo.root, vo.tail)
 
 	var left, right []T
+	first := true
 outer:
 	for {
-		bv := pv.next()
-		bvo := pvo.next()
-		if bv != bvo {
-			return false
+		if !first {
+			bv := pv.next()
+			bvo := pvo.next()
+			if bv != bvo {
+				return false
+			}
+			if !bv {
+				return true
+			}
 		}
-		if !bv {
-			return true
-		}
+		first = false
 
 		if pv.current() == pvo.current() {
 			// Skip common subtree
@@ -654,13 +659,17 @@ func (v Vector[T]) leaves() iter.Seq[*leafNode[T]] {
 	}
 }
 
-func (v Vector[T]) Get(idx int) T {
+func (v Vector[T]) checkIndex(idx int) {
 	if idx < 0 {
 		panic(fmt.Sprintf("index out of range [%d]", idx))
 	}
 	if uint(idx) >= uint(v.Length()) {
-		panic(fmt.Sprintf("index out of range [%d] with length %d", idx, v.treeN()))
+		panic(fmt.Sprintf("index out of range [%d] with length %d", idx, v.Length()))
 	}
+}
+
+func (v Vector[T]) Get(idx int) T {
+	v.checkIndex(idx)
 
 	if v.isInTail(uint(idx)) {
 		return v.tail.values[uint64(idx)-v.treeN()]
@@ -670,17 +679,18 @@ func (v Vector[T]) Get(idx int) T {
 }
 
 func (v Vector[T]) Update(i int, value T) Vector[T] {
-	if i < 0 {
-		panic(fmt.Sprintf("index out of range [%d]", i))
-	}
-	if uint64(i) >= v.treeN() {
-		panic(fmt.Sprintf("index out of range [%d] with length %d", i, v.treeN()))
+	v.checkIndex(i)
+
+	if v.isInTail(uint(i)) {
+		vc := v
+		vc.tail = clone(v.tail)
+		vc.tail.values[i%maxBranch] = value
+		return vc
 	}
 
-	// XXX handle tail
-
-	rootc := *v.root
-	parent := &rootc
+	vc := v
+	vc.root = clone(vc.root)
+	parent := vc.root
 	for addr, n := range v.root.traverse(uint(i), v.shift()) {
 		switch n := n.(type) {
 		case *interiorNode[T]:
@@ -694,10 +704,7 @@ func (v Vector[T]) Update(i int, value T) Vector[T] {
 		}
 	}
 
-	return Vector[T]{
-		root:     &rootc,
-		metadata: v.metadata,
-	}
+	return vc
 }
 
 //lint:ignore U1000 Debug helper
