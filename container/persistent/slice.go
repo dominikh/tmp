@@ -659,7 +659,7 @@ func (v Vector[T]) Get(idx int) T {
 		panic(fmt.Sprintf("index out of range [%d]", idx))
 	}
 	if uint(idx) >= uint(v.Length()) {
-		panic(fmt.Sprintf("index out of range [%d] with length %d", idx, v.treeN))
+		panic(fmt.Sprintf("index out of range [%d] with length %d", idx, v.treeN()))
 	}
 
 	if v.isInTail(uint(idx)) {
@@ -674,7 +674,7 @@ func (v Vector[T]) Update(i int, value T) Vector[T] {
 		panic(fmt.Sprintf("index out of range [%d]", i))
 	}
 	if uint64(i) >= v.treeN() {
-		panic(fmt.Sprintf("index out of range [%d] with length %d", i, v.treeN))
+		panic(fmt.Sprintf("index out of range [%d] with length %d", i, v.treeN()))
 	}
 
 	// XXX handle tail

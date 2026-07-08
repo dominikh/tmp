@@ -212,29 +212,29 @@ func checkVector(t *testing.T, v Vector[int], want []int) {
 func checkDenseInvariants(t *testing.T, v Vector[int], length int) {
 	t.Helper()
 
-	if v.rrb {
+	if v.rrb() {
 		// The fuzz tests only construct vectors via dense operations.
 		t.Fatalf("vector is unexpectedly not dense")
 	}
-	if v.treeN != uint(length) {
-		t.Fatalf("v.treeN = %d, want %d", v.treeN, length)
+	if v.treeN() != uint64(length) {
+		t.Fatalf("v.treeN = %d, want %d", v.treeN(), length)
 	}
 	if length == 0 {
 		if v.root != nil {
 			t.Fatalf("empty vector has non-nil root %T", v.root)
 		}
-		if v.shift != 0 {
-			t.Fatalf("empty vector shift = %d, want 0", v.shift)
+		if v.shift() != 0 {
+			t.Fatalf("empty vector shift = %d, want 0", v.shift())
 		}
 		return
 	}
 
 	wantShift := denseShiftForLen(length)
-	if v.shift != wantShift {
-		t.Fatalf("shift = %d, want %d for length %d", v.shift, wantShift, length)
+	if v.shift() != wantShift {
+		t.Fatalf("shift = %d, want %d for length %d", v.shift(), wantShift, length)
 	}
 	if v.root != nil {
-		if got := checkDenseNode(t, v.root, v.shift); got != uint(length) {
+		if got := checkDenseNode(t, v.root, v.shift()); got != uint(length) {
 			t.Fatalf("tree stores %d values, want %d", got, length)
 		}
 	}
