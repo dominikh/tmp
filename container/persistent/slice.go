@@ -13,7 +13,7 @@ import (
 
 const (
 	maxSearchError = 2
-	maxBranchExp   = 2 // 2 during debugging, 5 in production
+	maxBranchExp   = 5 // 2 during debugging, 5 in production
 
 	// maxBranch must be 2**maxBranchExp.
 	maxBranch = 1 << maxBranchExp
@@ -26,18 +26,31 @@ type Vector[T any] struct {
 	root *interiorNode[T]
 	// tail points to the trailing elements of the vector. Guaranteed to be
 	// non-nil when the vector is non-empty.
-	tail *leafNode[T]
-	// The number of values stored in the tree rooted at root. The total length
-	// of the vector is treeN + tail.n.
-	treeN uint
-	// shift is maxBranchExp * height. A vector of height h can store up to
-	// maxBranch<<shift (= maxBranch * 2**shift = 2**(maxBranchExp*(h+1))
-	// elements. h is zero-based, a vector with a single leaf node has height
-	// 0.
-	shift uint8
-	// rrb is true once concatenation or left slicing has occurred and the
-	// vector can no longer be assumed to be leftwise dense.
-	rrb bool
+	tail     *leafNode[T]
+	metadata uint64
+}
+
+func shiftAndTreeN(shift uint8, treeN uint64) uint64 {
+	return (treeN << 8) | uint64(shift)
+}
+
+// The number of values stored in the tree rooted at root. The total length
+// of the vector is treeN + tail.n.
+func (v Vector[T]) treeN() uint64 {
+	return uint64(v.metadata >> 8)
+}
+
+// shift is maxBranchExp * height. A vector of height h can store up to
+// maxBranch<<shift (= maxBranch * 2**shift = 2**(maxBranchExp*(h+1))
+// elements. h is zero-based, a vector with a single leaf node has height
+// 0 (the leaf is stored in the tail).
+func (v Vector[T]) shift() uint8 {
+	// TODO(dh): we don't need 8 bits for s hift
+	return uint8(v.metadata & 0xFF)
+}
+
+func (v Vector[T]) rrb() bool {
+	return false
 }
 
 func NewVector[T any](values []T) Vector[T] {
@@ -67,10 +80,9 @@ func NewVector[T any](values []T) Vector[T] {
 	shift := max(1, depth) * maxBranchExp
 
 	return Vector[T]{
-		treeN: uint(len(values)),
-		root:  buildTrie(values, shift).(*interiorNode[T]),
-		shift: uint8(shift),
-		tail:  tail,
+		root:     buildTrie(values, shift).(*interiorNode[T]),
+		tail:     tail,
+		metadata: shiftAndTreeN(uint8(shift), uint64(len(values))),
 	}
 }
 
@@ -94,7 +106,7 @@ func buildTrie[T any](elems []T, shift int) node[T] {
 }
 
 func (v Vector[T]) Append(value T) Vector[T] {
-	if !v.rrb {
+	if !v.rrb() {
 		if v.Length() == 0 {
 			// Very fast path
 			return Vector[T]{
@@ -119,8 +131,7 @@ func (v Vector[T]) Append(value T) Vector[T] {
 		vc := v
 		if v.root == nil {
 			// Until now we only had a tail. Create the tree.
-			vc.shift = maxBranchExp
-			vc.treeN = maxBranch
+			vc.metadata = shiftAndTreeN(maxBranchExp, maxBranch)
 			vc.root = &interiorNode[T]{
 				n:        1,
 				children: [maxBranch]node[T]{v.tail},
@@ -132,7 +143,7 @@ func (v Vector[T]) Append(value T) Vector[T] {
 			return vc
 		}
 
-		if full := maxBranch<<v.shift == v.treeN; full {
+		if full := maxBranch<<v.shift() == v.treeN(); full {
 			// The tree is dense and full at its current depth. Insert a
 			// new interior node at the top to hang new nodes off of.
 			vc.root = &interiorNode[T]{
@@ -144,11 +155,11 @@ func (v Vector[T]) Append(value T) Vector[T] {
 			vc.root = clone(v.root)
 		}
 
-		vc.treeN += maxBranch
+		vc.metadata = shiftAndTreeN(vc.shift(), vc.treeN()+maxBranch)
 
 		t := node[T](vc.root)
-		for shift := vc.shift; shift >= maxBranchExp; shift -= maxBranchExp {
-			i := (v.treeN >> shift) % maxBranch
+		for shift := vc.shift(); shift >= maxBranchExp; shift -= maxBranchExp {
+			i := (v.treeN() >> shift) % maxBranch
 			child := cloneNode(t.(*interiorNode[T]).children[i])
 			if shift == maxBranchExp && child != nil {
 				panic("unreachable")
@@ -207,20 +218,20 @@ func (v Vector[T]) Pop() Vector[T] {
 		// The tail will be empty after popping. Since the tail mustn't be
 		// empty, we promote the rightmost leaf.
 
-		if !v.rrb {
+		if !v.rrb() {
 			vc := v
 
-			if vc.shift < maxBranchExp {
+			if vc.shift() < maxBranchExp {
 				panic("internal error: shift smaller than expected")
 			}
 
 			var dfs func(n *interiorNode[T], shift uint8) node[T]
 			dfs = func(n *interiorNode[T], shift uint8) node[T] {
 				n = clone(n)
-				ic := ((v.treeN - 1) >> shift) % maxBranch
+				ic := ((v.treeN() - 1) >> shift) % maxBranch
 				if shift == maxBranchExp {
 					vc.tail = n.children[ic].(*leafNode[T])
-					vc.treeN -= uint(vc.tail.n)
+					vc.metadata = shiftAndTreeN(vc.shift(), vc.treeN()-uint64(vc.tail.n))
 					if ic == 0 {
 						assert(n.n == 1)
 						return nil
@@ -243,7 +254,7 @@ func (v Vector[T]) Pop() Vector[T] {
 					}
 				}
 			}
-			if nroot := dfs(vc.root, vc.shift); nroot != nil {
+			if nroot := dfs(vc.root, vc.shift()); nroot != nil {
 				vc.root = nroot.(*interiorNode[T])
 				if vc.root.n == 1 && is[*interiorNode[T]](vc.root.children[0]) {
 					vc.decShift()
@@ -251,8 +262,7 @@ func (v Vector[T]) Pop() Vector[T] {
 				}
 			} else {
 				// Only the tail is left
-				vc.root = nil
-				vc.shift = 0
+				vc.metadata = shiftAndTreeN(0, 0)
 			}
 			return vc
 		} else {
@@ -587,9 +597,9 @@ func (v Vector[T]) EqualFuncStrict[TO any](vo Vector[TO], eq func(T, TO) bool) b
 
 func (v Vector[T]) Length() int {
 	if v.tail == nil {
-		return int(v.treeN)
+		return int(v.treeN())
 	} else {
-		return int(v.treeN + uint(v.tail.n))
+		return int(v.treeN() + uint64(v.tail.n))
 	}
 }
 
@@ -653,17 +663,17 @@ func (v Vector[T]) Get(idx int) T {
 	}
 
 	if v.isInTail(uint(idx)) {
-		return v.tail.values[uint(idx)-v.treeN]
+		return v.tail.values[uint64(idx)-v.treeN()]
 	}
 
-	return v.root.index(uint(idx), v.shift)
+	return v.root.index(uint(idx), v.shift())
 }
 
 func (v Vector[T]) Update(i int, value T) Vector[T] {
 	if i < 0 {
 		panic(fmt.Sprintf("index out of range [%d]", i))
 	}
-	if uint(i) >= v.treeN {
+	if uint64(i) >= v.treeN() {
 		panic(fmt.Sprintf("index out of range [%d] with length %d", i, v.treeN))
 	}
 
@@ -671,7 +681,7 @@ func (v Vector[T]) Update(i int, value T) Vector[T] {
 
 	rootc := *v.root
 	parent := &rootc
-	for addr, n := range v.root.traverse(uint(i), v.shift) {
+	for addr, n := range v.root.traverse(uint(i), v.shift()) {
 		switch n := n.(type) {
 		case *interiorNode[T]:
 			nc := clone(n)
@@ -685,9 +695,8 @@ func (v Vector[T]) Update(i int, value T) Vector[T] {
 	}
 
 	return Vector[T]{
-		root:  &rootc,
-		treeN: v.treeN,
-		shift: v.shift,
+		root:     &rootc,
+		metadata: v.metadata,
 	}
 }
 
@@ -746,12 +755,12 @@ func (v Vector[T]) dot(name string, w io.Writer) {
 }
 
 func (v Vector[T]) isInTail(idx uint) bool {
-	return idx >= v.treeN
+	return uint64(idx) >= v.treeN()
 }
 
 func (v *Vector[T]) incShift() {
-	nshift := v.shift + maxBranchExp
-	if nshift < v.shift {
+	nshift := v.shift() + maxBranchExp
+	if nshift < v.shift() {
 		// This is impossible to hit unless there is a bug or memory corruption.
 		// v.shift is 'maxBranchExp * tree height' and a uint8. The max height
 		// of the tree is ln(2**64) / ln(2**maxBranchExp) and the max value of
@@ -762,15 +771,15 @@ func (v *Vector[T]) incShift() {
 
 		panic("internal error: increasing tree height would overflow")
 	}
-	v.shift = nshift
+	v.metadata = shiftAndTreeN(nshift, v.treeN())
 }
 
 func (v *Vector[T]) decShift() {
-	if v.shift < maxBranchExp {
+	if v.shift() < maxBranchExp {
 		// This should clearly not happen.
 		panic("internal error: decreasing tree height would overflow")
 	}
-	v.shift -= maxBranchExp
+	v.metadata = shiftAndTreeN(maxBranchExp, v.treeN())
 }
 
 type node[T any] interface {
